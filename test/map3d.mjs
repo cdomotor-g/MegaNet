@@ -296,17 +296,17 @@ ok('and there is no canvas over the map', beforePress.host === false);
 
 // The button, and the panel beside it.
 const btn3d = page.locator('.mn-map-3d');
-ok('the map has one ⛰️ button, in the side panel\'s strip', await btn3d.count() === 1
-   && await page.evaluate(() => !!document.querySelector('.mn-map-3d').closest('#help-panel .dock-strip')));
-// …in the Map section, last, with its camera pair under it — and the 3-D
-// settings with no button of their own: ⛰️ opens them (section 2).
+ok('the map has one ⛰️ button, on the map itself, under 🗺️ Map look', await btn3d.count() === 1
+   && await page.evaluate(() => !!document.querySelector('.mn-map-3d').closest('#leaflet-map .mn-mapbar')));
+// …in the corner's 3-D group with its camera pair under it — and the 3-D
+// settings with no button of their own: ⛰️ opens them as a pane (section 2).
 const rail3d = await page.evaluate(() => {
-  const show = document.querySelector('#help-panel .dock-strip > .dock-group[data-group="show"]');
+  const show = document.querySelector('#leaflet-map .mn-mapbar-group[data-group="3d"]');
   const keys = show ? [...show.children].map(b => b.dataset.dock || [...b.classList].find(c => c.startsWith('mn-map-')) || b.className) : [];
   return { keys, settingsBtn: !!document.querySelector('#help-panel .dock-tab[data-dock="map-3d"]'),
            pane: !!document.getElementById('map-3d-panel-body') && !!document.getElementById('map-3d-panel-body').closest('#help-panel .dock-pane') };
 });
-ok('…standing last in the Map section with its camera pair, the 3-D settings a pane with no button of its own',
+ok('…in the corner\'s 3-D group with its camera pair, the 3-D settings a pane with no button of its own',
    JSON.stringify(rail3d.keys.slice(-3)) === JSON.stringify(['mn-map-3d', 'mn-map-north', 'mn-map-tilt'])
      && !rail3d.settingsBtn && rail3d.pane, JSON.stringify(rail3d));
 const paneBefore = await page.evaluate(() => dockShowing());
@@ -961,7 +961,7 @@ const reachable = await page.evaluate(() => {
     // one control still *on* the map, in its top-right corner: the one the
     // canvas's z-index is actually standing between, and so the one that says
     // the window below the corners is right.
-    probes: ['.mn-map-3d', '.mn-map-full', '#help-panel .dock-tab[data-dock="map-display"]',
+    probes: ['.mn-map-3d', '.mn-map-full', '.mn-map-look',
              '#leaflet-map .leaflet-top.leaflet-right .mn-map-reset'].map(probe),
   };
 });
@@ -3011,7 +3011,7 @@ const flat3d = () => page.waitForFunction(() => !state.map3d && !Map3D._map(), n
 const tilted3d = () => page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: GL_TIMEOUT });
 const rail3dLook = () => page.evaluate(() => {
   syncDockLive();
-  const b = document.querySelector('#help-panel .dock-strip .mn-map-3d');
+  const b = document.querySelector('#leaflet-map .mn-mapbar .mn-map-3d');
   const leave = document.getElementById('map-3d-toggle');
   const cs = leave && leave.getClientRects().length ? getComputedStyle(leave) : null;
   return { showing: dockShowing(), on3d: !!state.map3d, gold: b.classList.contains('is-on'), ring: b.classList.contains('is-live'),

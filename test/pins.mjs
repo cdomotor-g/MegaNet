@@ -51,6 +51,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { repo } from './lib/paths.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -395,7 +396,7 @@ try {
   await page.evaluate(() => clearStationFilters(false));
 
   // ── 6. Map display: one owner, or everyone's but theirs ───────────────────
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForSelector('#map-owner', { state: 'attached' });
   const radios = () => page.evaluate(() => [...document.querySelectorAll('#map-owner-block input[type=radio]')].map((r) => r.disabled));
   check('the owner\'s two choices wait for an owner', (await radios()).every(Boolean));
@@ -505,7 +506,7 @@ try {
   }));
   check('The Signal bars pointer in Layers lands on ⏱️ Latency & signal\'s switch, and ticks nothing',
     landed.focused && landed.bars === barsBefore, JSON.stringify(landed));
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForSelector('#map-owner', { state: 'attached' });
 
   // ── 7. The switches, the legend and what is remembered ────────────────────

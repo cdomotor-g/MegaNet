@@ -1124,12 +1124,11 @@ async function main() {
       text:  document.getElementById('map-note').textContent,
       seen:  localStorage.getItem('mn-hint-display'),
     }));
-    // …and told where it is: at this width the 🗺️ is in the side panel's
-    // strip, not on the map, and a tip pointing at the map would send the
-    // operator looking for a button that is not there.
+    // …and told where it is: 🗺️ Map look, the top button on the right of the
+    // map, which opens Layers (app.js, openMapLook).
     check('a first visit is told about Layers, where it is, once',
-      tip.shown && /Layers/.test(tip.text) && /quiet/.test(tip.text) && /side panel/.test(tip.text)
-        && !/on the map/.test(tip.text) && tip.seen === '1',
+      tip.shown && /Map look/.test(tip.text) && /quiet/.test(tip.text) && /right of the map/.test(tip.text)
+        && tip.seen === '1',
       `shown=${tip.shown} seen=${tip.seen} "${tip.text}"`);
     await fp.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await fp.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });

@@ -30,6 +30,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -63,7 +64,7 @@ await page.evaluate(() => switchTab('stations'));
 await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
 await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
 
-await page.click('#help-panel .dock-tab[data-dock="map-repcompare"]');
+await pressDock(page, 'map-repcompare');
 await page.waitForTimeout(400);
 
 // ── 0. the panel ─────────────────────────────────────────────────────────────
@@ -79,7 +80,8 @@ const panel = await page.evaluate(() => {
     shown: !!(body && body.getClientRects().length), showing: dockShowing(),
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-repcompare')?.closest('.dock-group')?.dataset.group,
-    afterBest: at('[data-dock="map-repcompare"]') === at('[data-dock="map-bestrep"]') + 1,
+    // In 📻 Radio's list since the rail went by job, after Find a better site.
+    job: dockJobOf('map-repcompare'), radio: dockJobKeys('radio'),
     runDisabled: document.getElementById('repcmp-run')?.disabled,
     status: document.getElementById('repcmp-status')?.textContent || '',
     words: document.querySelectorAll('.repcmp-panel .bestrep-words dt').length,
@@ -88,7 +90,8 @@ const panel = await page.evaluate(() => {
 });
 ok('⚖️ Repeater comparison is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-repcompare' && panel.title === 'Repeater comparison', J(panel));
-ok('…in the tools group, straight after the best repeater finder', panel.group === 'tools' && panel.afterBest, J(panel));
+ok('…in Radio\'s list, straight after Find a better site', panel.job === 'radio'
+   && panel.radio.indexOf('map-repcompare') === panel.radio.indexOf('better') + 1, J(panel));
 ok('Compare is off with no repeaters, and the panel says what is missing',
    panel.runDisabled === true && /two or more repeaters/i.test(panel.status) && !panel.live, J(panel));
 ok('the words of the panel are listed in a fold, a dozen or more', panel.words >= 12, String(panel.words));

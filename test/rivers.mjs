@@ -133,7 +133,8 @@ try {
   // from the keyboard, or the note behind it is unreachable however real its
   // buttons are.
   await page.evaluate(() => {
-    document.querySelector('#help-panel .dock-tab[data-dock="map-display"]').focus();
+    // 🗺️ Map look, on the map, is the button for Layers now (app.js, openMapLook).
+    document.querySelector('.mn-map-look').focus();
   });
   await page.keyboard.press('Enter');
   await page.waitForTimeout(250);

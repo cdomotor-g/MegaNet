@@ -247,7 +247,10 @@ async function main() {
     const railLook = () => page.evaluate(() => {
       syncDockLive();
       const strip = document.querySelector('#help-panel .dock-strip');
-      const one = k => { const b = strip.querySelector(`.dock-tab[data-dock="${k}"]`);
+      // A tool's ring is worn in the rail by its job's button since the rail
+      // went by job (app.js, DOCK_JOBS): ✏️ by 🚩 Site, 🎯 and 〽️ by 📻 Radio.
+      const JOB = { 'map-draw': 'site', 'map-bestrep': 'radio', paths: 'radio' };
+      const one = k => { const b = strip.querySelector(`.dock-tab[data-dock="${JOB[k] || k}"]`);
         return b ? { gold: b.classList.contains('is-on'), ring: b.classList.contains('is-live'), title: b.title } : null; };
       return { showing: dockShowing(), draw: one('map-draw'), bestrep: one('map-bestrep'), paths: one('paths'), places: one('places'),
                rings: [...strip.querySelectorAll('.is-live')].map(b => b.dataset.dock || b.className),
@@ -260,17 +263,17 @@ async function main() {
     await page.evaluate(() => MapDraw.setTool('line'));
     await settle(page);
     rl = await railLook();
-    check('a draw tool armed behind the Layers pane: ✏️ ringed, not gold, its tooltip ending "on now"',
+    check('a draw tool armed behind the Layers pane: 🚩 Site ringed, not gold, its tooltip ending "on now"',
       rl.draw && rl.draw.ring && !rl.draw.gold && /on now$/.test(rl.draw.title), J(rl.draw));
     const ringCss = await page.evaluate(() => {
-      const b = document.querySelector('#help-panel .dock-tab[data-dock="map-draw"]');
+      const b = document.querySelector('#help-panel .dock-strip .dock-tab[data-dock="site"]');
       const ico = b.querySelector('.rail-ico');
       return { btn: getComputedStyle(b).boxShadow, ico: ico ? getComputedStyle(ico).boxShadow : 'none' };
     });
     check('…and the ring is drawn', ringCss.btn !== 'none' || ringCss.ico !== 'none', J(ringCss));
     await page.evaluate(() => setDockTab('map-draw'));
     rl = await railLook();
-    check('its own pane opened: gold, and no ring', rl.draw.gold && !rl.draw.ring && !/on now$/.test(rl.draw.title), J(rl.draw));
+    check('its own pane opened: 🚩 gold, and no ring', rl.draw.gold && !rl.draw.ring && !/on now$/.test(rl.draw.title), J(rl.draw));
     // Several things on at once, behind the Layers pane: a drawing, Best
     // repeater's pick armed, a link-budget end, pins being dropped is not
     // possible beside them (one click-taker at a time), and the magnifier.
@@ -288,7 +291,7 @@ async function main() {
     });
     await settle(page);
     rl = await railLook();
-    check('a drawing, Best repeater armed with a site chosen, and the magnifier on: ✏️ and 🎯 both ringed',
+    check('a drawing, Best repeater armed with a site chosen, and the magnifier on: 🚩 and 📻 both ringed',
       rl.draw.ring && rl.bestrep && rl.bestrep.ring && rl.magnify && rl.modes.includes('bestrep'), J(rl));
     await page.evaluate(() => clearStationsMapSelection());
     await settle(page);
@@ -311,7 +314,7 @@ async function main() {
       const saved = DOCK_LIVE['map-polar'];
       delete DOCK_LIVE['map-polar'];
       syncDockLive();
-      const b = document.querySelector('.dock-tab[data-dock="map-polar"]');
+      const b = document.querySelector('#help-panel .dock-job[data-dock="map-polar"]');
       const ringed = b.classList.contains('is-live');
       await clearStationsMapSelection();
       syncDockLive();

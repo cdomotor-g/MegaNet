@@ -56,6 +56,7 @@ import zlib from 'node:zlib';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -167,7 +168,7 @@ const look = (panel) => page.evaluate((p) => {
 // the pane already showing, whose button would shut the side panel instead.
 const openPane = async (panel) => {
   if (await page.evaluate((p) => dockShowing() !== `map-${p}`, panel)) {
-    await page.click(`#help-panel .dock-tab[data-dock="map-${panel}"]`);
+    await pressDock(page, `map-${panel}`);
     await page.waitForTimeout(250);
   }
   return look(panel);

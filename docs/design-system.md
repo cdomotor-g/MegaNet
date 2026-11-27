@@ -978,11 +978,12 @@ overlapping, and the icon is dropped while it is docked. Pinning is remembered
 **A map with a side panel beside it hands the whole corner over.** One map does:
 the Stations map, at every width (`MapChrome.dockInto(map, host)`, the host
 being the side panel). There every panel is moved, whole, into a pane of the
-side panel with a button in its strip, and every plain button is moved into the
-strip itself — in the corner's groups and order, a labelled group each with the
-corner's hairline between them — and the corner is left holding one button: ↺
-reset, built with `corner: true` so the side panel is never offered it, because
-a control about the map as a whole is looked for on the map. The
+side panel — reached from its job's list in the rail, or from 🗺️ Map look's
+tabs (*The two rails*, below) — and the plain buttons that are tools go with
+their job. The corner keeps what is about the map as a whole, each built with
+`corner: true` so the side panel is never offered it, because a control about
+the map is looked for on the map: 🗺️ Map look, 🔍 the Magnifier, ⛰️ the 3-D
+view with its camera pair, and ↺ reset, last. The
 corner icon and the 📌 are hidden in a pane: a pane already stays open, and a pin
 there would change nothing anyone could see. On a phone the strip is a rail
 beside the map, which ⋮ in the banner brings out and puts away, and a pane is a
@@ -1123,12 +1124,37 @@ the page less than 400 px — or, on a window too narrow for both, never more th
 55 % of the room). On the Stations tab it is also the tab's right-hand
 column: the station cards are one wrapper moved into its Stations pane (📍),
 the path tools (the elevation profile and the link budget) a second wrapper
-moved into a pane of their own (〽️), and every one of the Stations map's controls but ↺ (which stays in the map's top-right corner) is moved into its strip — a panel into
-a pane of its own. None of them is ever re-rendered to get there, which is what
-lets the Leaflet map beside them keep its view. The strip scrolls when it is
-taller than the window, which with the map's controls in it it is on a laptop;
-its rail is as wide as the nav's (56 px) so that a thin scrollbar stands beside
-the 44 px buttons rather than over them.
+moved into a pane of their own, and every panel the Stations map builds is
+moved into a pane of its own. None of them is ever re-rendered to get there,
+which is what lets the Leaflet map beside them keep its view.
+
+The strip on that tab is a **rail by job** (2026-11; `app.js`,
+`dockStripGroups` and `DOCK_JOBS`): 📍 Stations, 🔎 Places, 📻 Radio and 🚩
+Site, then 🧹 Clear the selection, ⛶ and ❔ at its foot. It replaced a rail of
+twenty-five buttons of five kinds, in which a panel, a way of drawing the map,
+a tool that needs a station and a one-tap action all looked alike. The rules
+it keeps:
+
+- **A rail button is a job, not a tool.** Radio and Site each open a pane that
+  lists their tools, one full-width button each with its name, what it does,
+  and a *Needs …* chip for what has to be picked first (`DOCK_NEEDS`) — so
+  nobody opens a tool to find out what it is for. A tool's pane carries
+  *← All radio tools* at its top (`syncDockSubnav`), and the job's rail button
+  stays lit while one of its tools is open; pressed then, it goes back to the
+  list, and pressed on the list it shuts the panel.
+- **Tools that answer one question three ways are one tool with tabs**
+  (`DOCK_FAMILIES`): *Find a better site* is Move or build a repeater, Move a
+  station and Along a river, each still its own pane and module.
+- **What the map shows lives on the map.** 🗺️ Map look is a button in the
+  map's corner (`corner: true`) that opens Layers, Imagery over time, the
+  Legend and Latency & signal — still the side panel's panes, with a row of
+  tabs between them. 🔍 and ⛰️ stand under it, and ↺ last.
+- **Search finds tools** (`STATIONS_TOOLS`, read by `palette.js`), from any
+  tab, by name or by the words a person would use for them.
+
+The strip scrolls when it is taller than the window, which now takes a very
+short window; its rail is as wide as the nav's (56 px) so that a thin
+scrollbar stands beside the 44 px buttons rather than over them.
 
 `npm run shell` holds it, as the claim an operator would make: every button in
 either rail can be brought on screen with that rail's own scrollbar, at the top

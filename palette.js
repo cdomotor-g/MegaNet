@@ -396,6 +396,21 @@ const Palette = (() => {
     copyToClipboard(url).then(ok => announce(ok ? 'Copied a link to where you are' : 'Could not copy the link'));
   }
 
+  // The Stations tab's tools (app.js, STATIONS_TOOLS) — Best repeater, Before
+  // you dig, Imagery over time — found by name or by the words a person would
+  // use for them, and opened where they live, from whatever tab this is.
+  // Only for a query: an empty box lists actions, not twenty tools.
+  function toolItems(q) {
+    const terms = navTerms(q);
+    if (!terms.length || typeof STATIONS_TOOLS === 'undefined') return [];
+    const scored = STATIONS_TOOLS.map(t => ({ t, score: navScore(`${t.name} ${t.where} ${t.find}`.toLowerCase(), terms) }))
+      .filter(x => x.score > 0);
+    const best = Math.max(0, ...scored.map(x => x.score));
+    return scored.filter(x => x.score === best).map(({ t, score }) => ({
+      kind: 'tool', score, icon: esc((Glyphs.RAIL[t.icon] || Glyphs.RAIL.help).emoji), label: t.name,
+      sub: `Tool · Stations › ${t.where}`, run: () => openStationsTool(t.key) }));
+  }
+
   function actionItems(q) {
     const all = actions().map(a => ({ ...a, kind: 'action', sub: 'Action' }));
     const terms = navTerms(q);
@@ -419,6 +434,7 @@ const Palette = (() => {
     { key: 'station', title: 'Stations' },
     { key: 'tab',     title: 'Tabs' },
     { key: 'action',  title: 'Actions' },
+    { key: 'tool',    title: 'Tools' },
     { key: 'licence', title: 'Licences' },
     { key: 'suggest', title: 'Did you mean?' },
     { key: 'mark',    title: 'Survey marks' },
@@ -431,7 +447,7 @@ const Palette = (() => {
     const st = stationItems(q);
     // A tab or an action that fits fewer of the typed words than another does
     // gives way: "copy link" is the action, not the tab that only says "links".
-    const found = [...tabItems(q), ...actionItems(q)];
+    const found = [...tabItems(q), ...actionItems(q), ...toolItems(q)];
     const top = Math.max(0, ...found.map(i => i.score || 0));
     const answers = found.filter(i => !top || (i.score || 0) >= top || !i.score);
     return [
@@ -439,6 +455,7 @@ const Palette = (() => {
       ...st.list,
       ...answers.filter(i => i.kind === 'tab'),
       ...answers.filter(i => i.kind === 'action'),
+      ...answers.filter(i => i.kind === 'tool'),
       ...licenceItems(raw),
       ...(st.near || []),
       ...markItems(raw),

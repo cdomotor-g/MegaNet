@@ -72,6 +72,7 @@
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -203,7 +204,7 @@ try {
   // Read off the legend's own pane, opened from 🔑 in the side panel's strip
   // the way an operator opens it — it was pinned open in the map's corner for
   // this until the map's controls moved into the side panel.
-  await page.click('#help-panel .dock-tab[data-dock="map-legend"]');
+  await pressDock(page, 'map-legend');
   await page.waitForTimeout(200);
   const legend = await page.evaluate(() => {
     const el = document.getElementById('map-legend');
@@ -630,7 +631,7 @@ try {
   // Map display is a pane of the side panel at this width, opened from 🗺️ in
   // its strip; it was pinned open in the map's corner for this section until
   // the map's controls moved there.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(300);
   const panel = () => page.evaluate(() => {
     const root = document.getElementById('map-display-block');

@@ -42,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
@@ -277,7 +278,7 @@ async function browserHalf() {
       off0.on === false && off0.q === 0 && !off0.img, J(off0));
     check('the legend offers it among the layers that are off', off0.alsoOff);
 
-    await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+    await pressDock(page, 'map-display');
     await page.waitForSelector('#dock-pane-map-display input[onchange^="MapRain.setEnabled"]', { timeout: 10000 });
     await page.click('#dock-pane-map-display input[onchange^="MapRain.setEnabled"]');
     await page.waitForFunction(() => MapRain._note().kind === 'ok' || MapRain._note().kind === 'fail', null, { timeout: 30000 });
@@ -389,7 +390,7 @@ async function browserHalf() {
     // Opening a station draws the tab again; the Layers pane is opened again
     // if that left it shut.
     if (await page.evaluate(() => document.getElementById('dock-pane-map-display')?.hidden !== false)) {
-      await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+      await pressDock(page, 'map-display');
       await page.waitForTimeout(300);
     }
     const noteTop = await page.evaluate(() => {

@@ -47,6 +47,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
 import { answer, asking } from './lib/ask.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -92,7 +93,7 @@ async function openPage(rows) {
 }
 
 const { page, counts } = await openPage(null);
-await page.click('#help-panel .dock-tab[data-dock="map-bestrep"]');
+await pressDock(page, 'map-bestrep');
 await page.waitForTimeout(400);
 
 const done = () => page.waitForFunction(() => ['done', 'blocked'].includes(MapBestRepeater.status().kind), null, { timeout: RUN_TIMEOUT });
@@ -110,9 +111,8 @@ const panel = await page.evaluate(() => {
     shown: !!(body && body.getClientRects().length), showing: dockShowing(),
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-bestrep')?.closest('.dock-group')?.dataset.group,
-    afterRelocate: at('[data-dock="map-bestrep"]') === at('[data-dock="map-relocate"]') + 1,
-    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 4
-      && at('[data-dock="map-repcompare"]') === at('[data-dock="map-bestrep"]') + 1,
+    // First in 📻 Radio's list since the rail went by job (app.js, DOCK_JOBS).
+    job: dockJobOf('map-bestrep'), radio: dockJobKeys('radio'),
     runDisabled: document.getElementById('bestrep-run')?.disabled,
     status: document.getElementById('bestrep-status')?.textContent || '',
     words: document.querySelectorAll('.bestrep-words dt').length,
@@ -121,8 +121,8 @@ const panel = await page.evaluate(() => {
 ok('a 🎯 Best repeater is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-bestrep' && panel.title === 'Best repeater',
    JSON.stringify(panel));
-ok('…in the tools group, straight after the relocation finder, with ⚖️ Repeater comparison, 📜 ACMA licences and 🌊 Riverside sites between it and What is here',
-   panel.group === 'tools' && panel.afterRelocate && panel.beforeHere, JSON.stringify(panel));
+ok('…first in Radio\'s list of tools',
+   panel.job === 'radio' && panel.radio[0] === 'map-bestrep', JSON.stringify(panel));
 ok('Find the best repeater is off with no station, and the panel says what is missing',
    panel.runDisabled === true && /Pick a station/.test(panel.status), panel.status);
 ok('…and the panel\'s words are listed where a finger can read them', panel.words >= 10, `${panel.words}`);

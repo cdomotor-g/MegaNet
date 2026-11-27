@@ -36,6 +36,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -68,7 +69,7 @@ try {
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
   await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
-  await page.click('#help-panel .dock-tab[data-dock="map-riverscout"]');
+  await pressDock(page, 'map-riverscout');
   await page.waitForTimeout(400);
 
   const settled = () => page.waitForFunction(() => MapRiverScout.status().kind === 'done', null, { timeout: RUN_TIMEOUT });
@@ -87,8 +88,9 @@ try {
       shown: !!(body && body.getClientRects().length), showing: dockShowing(),
       title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
       group: strip.find(b => b.dataset.dock === 'map-riverscout')?.closest('.dock-group')?.dataset.group,
-      afterAcma: at('[data-dock="map-riverscout"]') === at('[data-dock="map-acma"]') + 1,
-      beforeHere: at('.mn-map-here') === at('[data-dock="map-riverscout"]') + 1,
+      // Under 📻 Radio since the rail went by job: the last of 🗼 Find a
+      // better site's tabs (app.js, DOCK_FAMILIES).
+      job: dockJobOf('map-riverscout'), fam: dockFamilyKeys('better'),
       sweepDisabled: document.getElementById('riverscout-sweep')?.disabled,
       status: document.getElementById('riverscout-status')?.textContent || '',
       words: document.querySelectorAll('.bestrep-words dt').length,
@@ -97,8 +99,8 @@ try {
   });
   ok('🌊 Riverside sites is a pane of the side panel, open from its button in the strip',
      panel.present && panel.docked && panel.shown && panel.showing === 'map-riverscout' && panel.title === 'Riverside sites', JSON.stringify(panel).slice(0, 300));
-  ok('…in the tools group, straight after 📜 ACMA licences and before What is here',
-     panel.group === 'tools' && panel.afterAcma && panel.beforeHere, JSON.stringify({ g: panel.group, a: panel.afterAcma, h: panel.beforeHere }));
+  ok('…under Radio, the last of Find a better site\'s tabs',
+     panel.job === 'radio' && panel.fam[panel.fam.length - 1] === 'map-riverscout', JSON.stringify({ job: panel.job, fam: panel.fam }));
   ok('Score this river is off until a place is scored, and the panel says what to do',
      panel.sweepDisabled === true && /Pick a place/.test(panel.status), panel.status);
   ok('the panel\'s words are listed where a finger can read them', panel.words >= 8, `${panel.words}`);

@@ -58,6 +58,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng, hillyHeightAt } from './lib/terrarium.mjs';
 import { answer } from './lib/ask.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -141,7 +142,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(200);
 // The finder is a pane of the side panel at this width, opened from 🗼 in its
 // strip — with a real click, the way an operator opens it.
-await page.click('#help-panel .dock-tab[data-dock="map-sites"]');
+await pressDock(page, 'map-sites');
 await page.waitForTimeout(400);
 
 const runSites = async () => {
@@ -170,19 +171,20 @@ const panel = await page.evaluate(() => {
     present: !!wrap, docked: !!wrap && !!wrap.closest('#help-panel .dock-pane'),
     shown: !!(body && body.getClientRects().length), showing: dockShowing(),
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
-    label: strip.find(b => b.dataset.dock === 'map-sites')?.getAttribute('aria-label'),
-    group: group('[data-dock="map-sites"]'),
-    afterDig: at('[data-dock="map-sites"]') === at('[data-dock="map-dig"]') + 1,
-    beforeRelocate: at('[data-dock="map-relocate"]') === at('[data-dock="map-sites"]') + 1,
+    // Its place since the rail went by job (app.js, DOCK_JOBS): under 📻 Radio,
+    // the first of 🗼 Find a better site's tabs, whose button is at the top of
+    // its pane.
+    label: document.querySelector('#help-panel .dock-subnav .dock-tab[data-dock="map-sites"]')?.getAttribute('aria-label'),
+    job: dockJobOf('map-sites'), family: dockFamilyOf('map-sites'), fam: dockFamilyKeys('better'),
     runDisabled: document.getElementById('sites-run')?.disabled,
     status: document.getElementById('sites-status')?.textContent || '',
   };
 });
-ok('🗼 Move/New Repeater is a pane of the side panel, open from its button in the strip',
+ok('🗼 Move/New Repeater is a pane of the side panel, open from Radio › Find a better site',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-sites'
-     && panel.title === 'Move/New Repeater' && /^Move\/New Repeater — /.test(panel.label || ''), JSON.stringify(panel));
-ok('…in the tools group, straight after Before you dig (3e20a91 put it after the polar plot) and straight before the station relocation finder',
-   panel.group === 'tools' && panel.afterDig && panel.beforeRelocate, JSON.stringify(panel));
+     && panel.title === 'Move/New Repeater' && /^Move or build a repeater — Move\/New Repeater — /.test(panel.label || ''), JSON.stringify(panel));
+ok('…under Radio, the first of Find a better site\'s tabs, straight before the station relocation finder',
+   panel.job === 'radio' && panel.family === 'better' && panel.fam[0] === 'map-sites' && panel.fam[1] === 'map-relocate', JSON.stringify(panel));
 ok('Find sites is disabled with nothing to serve, and the panel says what is missing',
    panel.runDisabled === true && /Add the sites/.test(panel.status), panel.status);
 

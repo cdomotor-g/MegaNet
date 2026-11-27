@@ -2559,7 +2559,7 @@ function dockDrawerOpen() {
 function dockDrawerClose() {
   const showing = dockShowing();
   shutDock();
-  dockFocusBack(showing && document.querySelector(`#help-panel .dock-tab[data-dock="${CSS.escape(showing)}"]`));
+  dockFocusBack(dockTabFor(showing));
 }
 
 // Focus to `el` if it is on screen, and otherwise to what stands in for it: a
@@ -2654,6 +2654,12 @@ function dockSkeleton(panel) {
         <div class="dock-pane dock-pane-map dock-pane-twin" id="${dockPaneId('twin')}" data-dock="twin" hidden>
           ${DigitalTwin.paneHtml()}
         </div>
+        <div class="dock-pane dock-pane-jobs" id="${dockPaneId('radio')}" data-dock="radio" hidden>
+          ${dockJobPaneHtml('radio')}
+        </div>
+        <div class="dock-pane dock-pane-jobs" id="${dockPaneId('site')}" data-dock="site" hidden>
+          ${dockJobPaneHtml('site')}
+        </div>
       </div>
     </div>`;
 }
@@ -2727,7 +2733,7 @@ function dockMapListed(e) {
 function dockHas(id) {
   if (id === 'help') return true;
   if (id === 'stations' || id === 'paths') return dockStationsHere();
-  if (id === 'places' || id === 'twin') return dockHoldsMapTools();
+  if (id === 'places' || id === 'twin' || id === 'radio' || id === 'site') return dockHoldsMapTools();
   if (!id.startsWith('map-') || state.activeTab !== 'stations') return false;
   const e = dockMapItems.get(id);
   if (e) return dockMapListed(e);
@@ -2818,72 +2824,358 @@ function helpShowing() {
 }
 
 // Everything in the strip right now, as the groups it stands in. On the
-// Stations tab that is the rail the operator reads down (Option B of the side
-// rail's redesign): the names toggle at the top, three sections that fold
-// under their headings when the names are on — Stations & places (the cards,
-// Find a place, the path tools, the twin), Map (what the map shows, the
-// corner's `show` group, and its `3d` — ⛰️ the 3-D view and its camera — last
-// in it) and Tools (what is pointed at it, the corner's `tools`) — and a foot
-// that stays at the bottom of the rail whatever is scrolled above it: 🧹 Clear
-// the selection, ⛶ (the corner's `screen`), and ❔ last. Everywhere else it is
-// ❔ alone. The map's controls are placed by their corner group and their place
-// in it — not by the order they were built, which for the polar plot and the
-// site finder is long after the rest. Each item is either a pane's button
-// ('tab', made and kept by syncDockStrip) or a plain button ('action', the
-// element itself): 🧹, the names toggle, or one of MapChrome's. A button whose
-// map is being built again has no element to stand in the strip until the new
-// one arrives, so it is simply not there for that moment; a pane's button is.
+// Stations tab that is the rail by job (Option 4 of the side panel's second
+// redesign, 2026-11): the names toggle at the top; four buttons — 📍 Stations
+// (the cards), 🔎 Places, 📻 Radio and 🚩 Site, the last two each opening a
+// list of their tools (DOCK_JOBS) rather than standing every tool in the rail;
+// and a foot that stays at the bottom of the rail whatever is scrolled above
+// it: 🧹 Clear the selection, ⛶ (the corner's `screen`), and ❔ last. What the
+// map shows is not in the rail at all: it is one 🗺️ Map look button on the
+// map itself (openMapLook), whose panes carry a row of tabs between them
+// (syncDockSubnav), and 🔍 and ⛰️ stay on the map beside it (stationsMapPanels,
+// `corner: true`). Everywhere else the strip is ❔ alone. Each item is either a
+// pane's button ('tab', made and kept by syncDockStrip) or a plain button
+// ('action', the element itself): 🧹, the names toggle, or ⛶.
 function dockStripGroups() {
   const help = { key: 'help', kind: 'tab', icon: Glyphs.rail('help'), label: 'Help', name: 'Help' };
   if (!dockHoldsMapTools()) return [{ name: 'foot', label: '', items: [help] }];
   const groups = [];
   // The names toggle, a desktop's alone: a phone's rail is always icons.
   if (!isPhoneNav()) groups.push({ name: 'rail', label: '', items: [{ key: 'names', kind: 'action', el: dockNamesEl() }] });
-  const here = dockStationsHere();
-  const places = [];
-  if (here) {
-    places.push({ key: 'stations', kind: 'tab', icon: Glyphs.rail('stations'), name: 'Stations',
-                  label: 'Stations — filters, station list and station details' });
+  const jobs = [];
+  if (dockStationsHere()) {
+    jobs.push({ key: 'stations', kind: 'tab', icon: Glyphs.rail('stations'), name: 'Stations',
+                label: 'Stations — filters, station list and station details' });
   }
-  places.push({ key: 'places', kind: 'tab', icon: Glyphs.rail('places'), name: 'Find a place',
-                label: 'Find a place — a town, river, catchment, council area, survey mark or coordinate' });
-  if (here) {
-    places.push({ key: 'paths', kind: 'tab', icon: Glyphs.rail('paths'), name: 'Radio link',
-                  label: 'Radio link — the elevation profile and fade margin between two points, and the link budget' });
+  jobs.push({ key: 'places', kind: 'tab', icon: Glyphs.rail('places'), name: 'Places',
+              label: 'Places — find a town, river, catchment, council area, survey mark or coordinate' });
+  for (const id of ['radio', 'site']) {
+    const j = DOCK_JOBS[id];
+    jobs.push({ key: id, kind: 'tab', icon: Glyphs.rail(id), name: j.name, label: j.label });
   }
-  // The digital twin's pane: what was the Digital Twin tab's left column —
-  // the finder, the scene's settings, the ground truth and the .glb — beside
-  // the map the twin opens in (digital-twin.js, paneHtml).
-  places.push({ key: 'twin', kind: 'tab', icon: Glyphs.rail('twin'), name: 'Digital twin',
-                label: 'Digital twin — open a station\'s twin, its scene settings, ground truth and the .glb for Blender' });
-  groups.push({ name: 'places', label: 'Stations & places', fold: true, items: places });
-  const sections = { show: 'Map', tools: 'Tools' };
-  // The corner's `3d` group — ⛰️ and its camera — stands last in Map rather
-  // than in the foot: the 3-D view is a way of showing the map, not a button
-  // about the screen. (The corner keeps it a group of its own, ranked after
-  // the tools, so it comes after everything else in Map.)
-  const sectionOf = group => (group === '3d' ? 'show' : group);
+  groups.push({ name: 'jobs', label: 'Stations, places and tools', items: jobs });
   // 🧹 Clear the selection heads the foot: the side panel's own button rather
   // than MapChrome's, and one an operator reaches for whatever is scrolled.
   const foot = { name: 'foot', label: 'Selection, view and help', items: [{ key: 'clear', kind: 'action', el: dockClearEl() }] };
-  // A pane another control opens (`strip: false` — the 3-D settings, which ⛰️
-  // opens) is a pane here and has no button.
+  // The map's own controls stand in the strip only when they belong to no job
+  // and are not a way of showing the map: ⛶, the corner's `screen` group.
   const map = [...dockMapItems.values()]
-    .filter(e => dockMapListed(e) && (e.kind === 'panel' || e.el) && e.strip !== false)
+    .filter(e => dockMapListed(e) && e.kind !== 'panel' && e.el && e.strip !== false && !dockJobOf(e.key)
+                 && e.group !== 'show' && e.group !== 'tools' && e.group !== '3d')
     .sort((a, b) => a.rank - b.rank || a.order - b.order);
-  for (const e of map) {
-    const it = e.kind === 'panel'
-      ? { key: e.key, kind: 'tab', icon: e.icon, label: e.label, name: e.name, entry: e }
-      : { key: e.key, kind: 'action', el: e.el };
-    const name = sectionOf(e.group);
-    if (!sections[name]) { foot.items.push(it); continue; }
-    let g = groups.find(x => x.name === name);
-    if (!g) groups.push(g = { name, label: sections[name], fold: true, items: [] });
-    g.items.push(it);
-  }
+  for (const e of map) foot.items.push({ key: e.key, kind: 'action', el: e.el });
   foot.items.push(help);
   groups.push(foot);
   return groups;
+}
+
+// ── Jobs: the tools a rail button opens a list of ───────────────────────────
+//
+// 📻 Radio and 🚩 Site are panes of their own, each a list of the tools for
+// that job: a button per tool with its name, what it does and what it needs
+// picked first. Pressing one opens that tool's own pane, as its rail button
+// used to, and the tool's pane carries a "← Radio" back to the list. The keys
+// are the panes' keys — `map-<panel id>` for a tool the map hands over, the
+// side panel's own `paths` and `twin` — and `btn-<class>` for a tool that is a
+// plain button (ℹ️ What's here?), which is pressed for real. A tool the map
+// hands over that no list names goes on the end of Site, so a new one is never
+// lost; one in the corner's `show` group goes with Map look.
+const DOCK_JOBS = {
+  radio: {
+    name: 'Radio',
+    label: 'Radio — the best repeater, coverage, radio links, better sites, repeater comparison and licences',
+    lead: 'What hears what, and where a radio would be heard best.',
+    keys: ['map-bestrep', 'map-polar', 'paths', 'better', 'map-repcompare', 'map-acma'],
+  },
+  site: {
+    name: 'Site',
+    label: 'Site — before you dig, what is here, draw & measure, and the digital twin',
+    lead: 'The ground at a station or a spot: what is under it, around it and how far.',
+    keys: ['map-dig', 'btn-mn-map-here', 'map-draw', 'twin'],
+  },
+};
+
+// Tools that answer one question three ways, listed once and opened on the
+// way the operator used last, with tabs between them at the top of the pane:
+// 🗼 Find a better site — a repeater moved or built (map-sites), a station
+// moved (map-relocate), a spot along a river (map-riverscout). Each is still
+// its own pane and its own module; only how they are found changed.
+const DOCK_FAMILIES = {
+  better: {
+    job: 'radio', icon: 'sites', name: 'Find a better site',
+    what: 'where a radio would be heard better: a repeater moved or built, a new home for a station, or a spot along a river',
+    keys: ['map-sites', 'map-relocate', 'map-riverscout'],
+    tabs: { 'map-sites': 'Move or build a repeater', 'map-relocate': 'Move a station', 'map-riverscout': 'Along a river' },
+  },
+};
+
+// Which family a pane is in, or null.
+function dockFamilyOf(key) {
+  for (const [id, f] of Object.entries(DOCK_FAMILIES)) if (f.keys.includes(key)) return id;
+  return null;
+}
+
+// A family's panes that are here now.
+function dockFamilyKeys(fam) {
+  return DOCK_FAMILIES[fam].keys.filter(key => { const e = dockMapItems.get(key); return !!e && dockMapListed(e) && e.kind === 'panel'; });
+}
+
+// A family opened from its job's list: the pane used last, or its first.
+function openDockFamily(fam) {
+  const keys = dockFamilyKeys(fam);
+  const last = state.dockFamily && state.dockFamily[fam];
+  const want = keys.includes(last) ? last : keys[0];
+  if (want) setDockTab(want);
+}
+
+// What the map shows: the panes 🗺️ Map look opens, in the order of its tabs.
+const DOCK_LOOK = ['map-display', 'map-history', 'map-legend', 'map-latency'];
+
+// What each tool needs picked before it can answer, said on its button so
+// nobody opens a tool to find out. Only where it is true every time.
+const DOCK_NEEDS = {
+  'map-bestrep': 'a station',
+  'map-polar': 'a spot or a station',
+  paths: 'two points',
+  'map-relocate': 'a station',
+  'map-riverscout': 'a station and a river',
+  'map-repcompare': 'two or more repeaters',
+  'map-dig': 'a spot or a line',
+  'btn-mn-map-here': 'a spot',
+  twin: 'a station',
+};
+
+// The side panel's own tools in a list, which are not the map's: the path
+// tools and the twin. Name, what it does, and its picture.
+const DOCK_JOB_OWN = {
+  paths: { icon: 'paths', name: 'Radio link', what: 'the elevation profile and fade margin between two points, and the link budget' },
+  twin: { icon: 'twin', name: 'Digital twin', what: 'open a station\'s twin, its scene settings, ground truth and the .glb for Blender' },
+};
+
+// Which job a pane or button is in — 'radio', 'site', 'look' — or null.
+function dockJobOf(key) {
+  if (!key) return null;
+  for (const [id, j] of Object.entries(DOCK_JOBS)) if (j.keys.includes(key)) return id;
+  const fam = dockFamilyOf(key);
+  if (fam) return DOCK_FAMILIES[fam].job;
+  if (DOCK_LOOK.includes(key)) return 'look';
+  const e = dockMapItems.get(key);
+  if (!e) return null;
+  if (e.group === 'show' && e.kind === 'panel' && e.strip !== false) return 'look';
+  if (e.group === 'tools') return 'site';
+  return null;
+}
+
+// A job's keys as they stand now: its own, then the strays (above), in the
+// corner's order — only those that are here to be pressed.
+function dockJobKeys(job) {
+  const own = job === 'look' ? DOCK_LOOK : DOCK_JOBS[job].keys;
+  const extra = [...dockMapItems.values()]
+    .filter(e => !own.includes(e.key) && !dockFamilyOf(e.key) && dockJobOf(e.key) === job)
+    .sort((a, b) => a.rank - b.rank || a.order - b.order)
+    .map(e => e.key);
+  return [...own, ...extra].filter(key => {
+    if (DOCK_FAMILIES[key]) return dockFamilyKeys(key).length > 0;
+    if (DOCK_JOB_OWN[key]) return dockHas(key);
+    const e = dockMapItems.get(key);
+    return !!e && dockMapListed(e) && (e.kind === 'panel' ? e.strip !== false : !!e.el);
+  });
+}
+
+// Whether `key` is showing, or is the job of what is showing — the rail's
+// 📻 stays lit while one of its tools is open.
+function dockJobOn(key, showing) {
+  return !!showing && (showing === key || dockJobOf(showing) === key);
+}
+
+function dockJobPaneHtml(job) {
+  const j = DOCK_JOBS[job];
+  return `<h2 class="dock-jobs-title">${esc(j.name)}</h2>
+          <p class="dock-jobs-lead">${esc(j.lead)}</p>
+          <div class="dock-jobs-list" role="group" aria-label="${esc(j.name)} tools"></div>
+          <div class="dock-jobs-hold" hidden></div>`;
+}
+
+// One tool's button in a job's list. A pane's is that pane's button — the
+// entry's `tab`, so focus handed to "the pane's button" lands here — and a
+// plain button's stands in for it, the real one kept out of sight in the pane
+// where its module still finds it and writes its state.
+const dockJobBtns = new Map();
+function dockJobBtn(key) {
+  const e = dockMapItems.get(key);
+  const own = DOCK_JOB_OWN[key] || DOCK_FAMILIES[key];
+  let b = e && e.kind === 'panel' ? e.tab : dockJobBtns.get(key);
+  if (b && !b.classList.contains('dock-job')) b = null;
+  if (!b) {
+    b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dock-job';
+    b.dataset.dock = key;
+    const label = own ? `${own.name} — ${own.what}` : (e && e.label) || '';
+    const cut = label.indexOf(' — ');
+    const name = own ? own.name : (e && e.name) || (cut > 0 ? label.slice(0, cut) : label);
+    const what = own ? own.what : cut > 0 ? label.slice(cut + 3) : '';
+    const icon = own ? Glyphs.rail(own.icon) : (e && e.icon) || '';
+    const needs = DOCK_NEEDS[key];
+    if (DOCK_FAMILIES[key]) {
+      b.setAttribute('onclick', `openDockFamily('${key}')`);
+    } else if (e && e.kind !== 'panel') {
+      b.setAttribute('onclick', `dockJobPress('${key}')`);
+    } else {
+      b.setAttribute('aria-controls', dockPaneId(key));
+      b.setAttribute('onclick', `toggleDockTab('${key}')`);
+    }
+    b.setAttribute('aria-label', label + (needs ? ` (needs ${needs})` : ''));
+    b.innerHTML = `<span class="dock-job-ico" aria-hidden="true">${icon}</span>`
+      + `<span class="dock-job-text" aria-hidden="true"><span class="dock-job-name">${esc(name)}</span>`
+      + (what ? `<span class="dock-job-what">${esc(what)}</span>` : '')
+      + (needs ? `<span class="dock-job-needs">Needs ${esc(needs)}</span>` : '')
+      + '</span>';
+    if (e && e.kind === 'panel') e.tab = b;
+    else dockJobBtns.set(key, b);
+  }
+  return b;
+}
+
+// A plain button's tool pressed from its list: the real button pressed. On a
+// phone the list is a drawer over the map the tool is waiting for a tap on,
+// so the drawer goes.
+function dockJobPress(key) {
+  const e = dockMapItems.get(key);
+  if (!e || !e.el) return;
+  e.el.click();
+  if (isPhoneNav() && dockShowing()) shutDock();
+  else renderDock();
+}
+
+// Fill each job's list with what is here now. Cheap, and safe to repeat: it
+// moves nothing that is already where it belongs.
+function syncDockJobs() {
+  for (const job of Object.keys(DOCK_JOBS)) {
+    const pane = document.getElementById(dockPaneId(job));
+    if (!pane) continue;
+    const list = pane.querySelector('.dock-jobs-list');
+    const hold = pane.querySelector('.dock-jobs-hold');
+    const keys = dockHoldsMapTools() ? dockJobKeys(job) : [];
+    const els = keys.map(dockJobBtn);
+    for (const c of [...list.children]) if (!els.includes(c)) c.remove();
+    els.forEach((el, i) => { if (list.children[i] !== el) list.insertBefore(el, list.children[i] || null); });
+    // The real plain buttons, kept where their modules find them.
+    const real = keys.map(k => dockMapItems.get(k)).filter(e => e && e.kind !== 'panel' && e.el).map(e => e.el);
+    for (const c of [...hold.children]) if (!real.includes(c)) c.remove();
+    for (const el of real) if (el.parentNode !== hold) hold.appendChild(el);
+  }
+}
+
+// The row at the top of a pane that belongs to a job: Map look's tabs between
+// its panes, or a "← Radio" back to the list a tool was opened from. One
+// element, moved to the top of whichever pane is showing, sticky there.
+let dockSubnavEl = null;
+function syncDockSubnav(showing) {
+  const job = dockJobOf(showing);
+  const pane = showing && document.getElementById(dockPaneId(showing));
+  if (!job || !pane) { if (dockSubnavEl) dockSubnavEl.remove(); return; }
+  const strip = document.querySelector('#help-panel .dock-strip');
+  if (!dockSubnavEl) {
+    dockSubnavEl = document.createElement('div');
+    dockSubnavEl.className = 'dock-subnav';
+  }
+  const nav = dockSubnavEl;
+  nav.dataset.job = job;
+  let els;
+  if (job === 'look') {
+    nav.setAttribute('role', 'group');
+    nav.setAttribute('aria-label', 'Map look');
+    const title = nav.querySelector(':scope > .dock-subnav-title') || Object.assign(document.createElement('span'), {
+      className: 'dock-subnav-title', textContent: 'Map look' });
+    const tabs = dockJobKeys('look').map(key => {
+      const e = dockMapItems.get(key);
+      const b = dockTabEl(strip, { key, kind: 'tab', icon: e.icon, label: e.label, name: e.name, entry: e });
+      const on = showing === key;
+      b.setAttribute('aria-label', e.label);
+      b.title = e.label;
+      b.setAttribute('aria-expanded', String(on));
+      b.classList.toggle('is-on', on);
+      return b;
+    });
+    els = [title, ...tabs];
+  } else {
+    nav.removeAttribute('role');
+    nav.removeAttribute('aria-label');
+    let back = nav.querySelector(':scope > .dock-back');
+    if (!back) {
+      back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'dock-back';
+    }
+    back.setAttribute('onclick', `setDockTab('${job}')`);
+    back.textContent = `← All ${DOCK_JOBS[job].name.toLowerCase()} tools`;
+    back.title = `Back to the list of ${DOCK_JOBS[job].name.toLowerCase()} tools`;
+    els = [back];
+    // A family's panes: its name, and a tab for each way of asking.
+    const fam = dockFamilyOf(showing);
+    if (fam) {
+      const f = DOCK_FAMILIES[fam];
+      if (!state.dockFamily) state.dockFamily = {};
+      state.dockFamily[fam] = showing;
+      nav.setAttribute('role', 'group');
+      nav.setAttribute('aria-label', f.name);
+      let title = nav.querySelector(':scope > .dock-subnav-title');
+      if (!title) title = Object.assign(document.createElement('span'), { className: 'dock-subnav-title' });
+      title.textContent = f.name;
+      els.push(title, ...dockFamilyKeys(fam).map(key => {
+        const e = dockMapItems.get(key);
+        const b = dockTabEl(strip, { key, kind: 'tab', icon: e.icon, label: e.label, name: f.tabs[key] || e.name, entry: e });
+        const name = b.querySelector('.dock-name');
+        if (name && f.tabs[key]) name.textContent = f.tabs[key];
+        const on = showing === key;
+        b.setAttribute('aria-label', `${f.tabs[key] || e.name} — ${e.label}`);
+        b.title = e.label;
+        b.setAttribute('aria-expanded', String(on));
+        b.classList.toggle('is-on', on);
+        return b;
+      }));
+    }
+  }
+  for (const c of [...nav.children]) if (!els.includes(c)) c.remove();
+  els.forEach((el, i) => { if (nav.children[i] !== el) nav.insertBefore(el, nav.children[i] || null); });
+  if (pane.firstChild !== nav) pane.insertBefore(nav, pane.firstChild);
+}
+
+// The button that stands for a pane now: its own if it is on screen, else its
+// job's in the rail (a tool's button is in a list that has gone), else Map
+// look's on the map.
+function dockTabFor(key) {
+  if (!key) return null;
+  const own = document.querySelector(`#help-panel [data-dock="${CSS.escape(key)}"]:is(.dock-tab, .dock-job)`);
+  if (own && own.getClientRects().length) return own;
+  const job = dockJobOf(key);
+  if (job === 'look') return document.querySelector('.mn-map-look');
+  return job ? document.querySelector(`#help-panel .dock-strip .dock-tab[data-dock="${job}"]`) : own;
+}
+
+// 🗺️ Map look, the button on the map: the pane it opened last (Layers the
+// first time), or, pressed while one of them is showing, the side panel shut.
+function openMapLook() {
+  const showing = dockShowing();
+  if (dockJobOf(showing) === 'look') { shutDock(); return; }
+  const keys = dockJobKeys('look');
+  const want = keys.includes(state.dockLook) ? state.dockLook : keys[0];
+  if (want) setDockTab(want);
+}
+
+// Its state, written with the rail's: pressed while a look pane is showing,
+// ringed while one of them has something on and is not.
+function syncMapLookBtn(showing) {
+  const look = dockJobOf(showing) === 'look';
+  if (look) state.dockLook = showing;
+  const live = !look && dockHoldsMapTools() && dockJobKeys('look').some(dockToolLive);
+  for (const b of document.querySelectorAll('.mn-map-look')) {
+    b.setAttribute('aria-expanded', String(look));
+    if (b.classList.contains('is-on') !== look) b.classList.toggle('is-on', look);
+    if (b.classList.contains('is-live') !== live) b.classList.toggle('is-live', live);
+    dockLiveTitle(b, live);
+  }
 }
 
 // The rail's width in px: the names' width when they are showing, the strip's
@@ -3179,16 +3471,15 @@ function syncDockStrip(showing) {
       box.removeAttribute('aria-label');
     }
     if (strip.children[gi] !== box) strip.insertBefore(box, strip.children[gi] || null);
-    const folded = !!g.fold && state.dockFolded.has(g.name);
-    box.classList.toggle('is-folded', folded);
     const els = g.items.map(it => (it.kind === 'action' ? it.el : dockTabEl(strip, it)));
-    if (g.fold) els.unshift(dockFoldEl(box, g, folded));
     for (const c of [...box.children]) if (!els.includes(c)) c.remove();
     els.forEach((el, i) => { if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null); });
     g.items.forEach(it => {
       if (it.kind !== 'tab') return;
       const b = dockTabEl(strip, it);
-      const on = showing === it.key;
+      // A job's button stays lit while one of its tools is open: that is where
+      // the operator is, and pressing it goes back to the list.
+      const on = dockJobOn(it.key, showing);
       // On a phone's edge tab the open help pane is a drawer and this button
       // is the tab on its edge, so it is the drawer's close button and says
       // so. Everywhere else — a phone's rail included, where the button stays
@@ -3207,6 +3498,8 @@ function syncDockStrip(showing) {
     });
   });
   syncDockNamesEl();
+  syncDockJobs();
+  syncDockSubnav(showing);
   syncDockLive();
   dockWatchFoot(strip.querySelector(':scope > .dock-group[data-group="foot"]'));
   if (had && had !== document.activeElement && strip.contains(had)) had.focus({ preventScroll: true });
@@ -3236,7 +3529,58 @@ const DOCK_LIVE = {
   'map-sites':    () => MapSites.live(),
   'map-relocate': () => MapRelocate.live(),
   'map-bestrep':  () => MapBestRepeater.live(),
+  'btn-mn-map-here': () => MapHere.armed(),
+  better:         () => dockFamilyKeys('better').some(dockToolLive),
 };
+
+// A tool on the Stations tab, opened from anywhere — the search (palette.js):
+// the tab first, then, once its map has handed its controls over, the tool's
+// pane, its family's, Map look's, or its button pressed.
+function openStationsTool(key) {
+  if (state.activeTab !== 'stations') switchTab('stations');
+  let tries = 0;
+  const step = () => {
+    if (state.activeTab !== 'stations') return;
+    if (DOCK_FAMILIES[key] && dockFamilyKeys(key).length) { openDockFamily(key); return; }
+    if (key === 'look' && dockJobKeys('look').length) { openMapLook(); return; }
+    if (key.startsWith('corner-')) {
+      const b = document.querySelector(`.mn-mapbar .${CSS.escape(key.slice(7))}`);
+      if (b) { b.click(); return; }
+    } else if (key.startsWith('btn-')) {
+      const e = dockMapItems.get(key);
+      if (e && e.el) { e.el.click(); return; }
+    } else if (dockHas(key) && (!key.startsWith('map-') || dockMapItems.has(key))) {
+      setDockTab(key);
+      return;
+    }
+    if (++tries < 50) setTimeout(step, 100);
+  };
+  setTimeout(step, 0);
+}
+
+// The Stations tab's tools as the search finds them (palette.js): the words a
+// person might type for each, beyond its name.
+const STATIONS_TOOLS = [
+  { key: 'map-bestrep', icon: 'bestrep', name: 'Best repeater', where: 'Radio', find: 'which repeater hears heard best base route' },
+  { key: 'map-polar', icon: 'coverage', name: 'Radio coverage', where: 'Radio', find: 'coverage range polar hear reach around' },
+  { key: 'paths', icon: 'paths', name: 'Radio link', where: 'Radio', find: 'link profile elevation fade margin budget fresnel line of sight between two points' },
+  { key: 'better', icon: 'sites', name: 'Find a better site', where: 'Radio', find: 'better site move build new repeater relocate station river riverside hilltop' },
+  { key: 'map-sites', icon: 'sites', name: 'Move or build a repeater', where: 'Radio › Find a better site', find: 'move new repeater build site finder hilltop' },
+  { key: 'map-relocate', icon: 'relocate', name: 'Move a station', where: 'Radio › Find a better site', find: 'relocate move station new home' },
+  { key: 'map-riverscout', icon: 'riverscout', name: 'Along a river', where: 'Radio › Find a better site', find: 'river riverside gauge strip along' },
+  { key: 'map-repcompare', icon: 'repcompare', name: 'Repeater comparison', where: 'Radio', find: 'compare repeaters both carry' },
+  { key: 'map-acma', icon: 'acma', name: 'ACMA licences', where: 'Radio', find: 'acma licence license licences area register' },
+  { key: 'map-dig', icon: 'dig', name: 'Before you dig', where: 'Site', find: 'dig power lines cables pipes trench easement property soils underground' },
+  { key: 'btn-mn-map-here', icon: 'here', name: 'What’s here?', where: 'Site', find: 'what here spot point click identify' },
+  { key: 'map-draw', icon: 'draw', name: 'Draw & measure', where: 'Site', find: 'draw measure distance area line shape kml' },
+  { key: 'twin', icon: 'twin', name: 'Digital twin', where: 'Site', find: 'twin 3d glb blender scene' },
+  { key: 'map-display', icon: 'layers', name: 'Layers', where: 'Map look', find: 'layers base map satellite overlay labels views rivers contours' },
+  { key: 'map-history', icon: 'history', name: 'Imagery over time', where: 'Map look', find: 'history imagery over time old photos 1943 past years aerial' },
+  { key: 'map-legend', icon: 'legend', name: 'Legend', where: 'Map look', find: 'legend key colours symbols what pins mean' },
+  { key: 'map-latency', icon: 'latency', name: 'Latency & signal', where: 'Map look', find: 'latency fresh freshness signal snr colour pins protocol alert2' },
+  { key: 'corner-mn-map-3d', icon: 'view3d', name: '3-D view', where: 'the map', find: '3d three dimensional tilt terrain relief' },
+  { key: 'corner-mn-map-magnify', icon: 'magnify', name: 'Magnifier', where: 'the map', find: 'magnifier magnify zoom glass closer' },
+];
 
 function dockToolLive(key) {
   try {
@@ -3261,17 +3605,34 @@ function syncDockLive() {
   dockLiveWatch();
   const tools = dockHoldsMapTools();
   const showing = dockShowing();
-  for (const b of strip.querySelectorAll('.dock-tab[data-dock]')) {
-    const live = tools && b.dataset.dock !== showing && dockToolLive(b.dataset.dock);
+  // Every pane's button in the panel — the rail's, a job's list's, Map look's
+  // tabs — ringed while its tool has something on and is not the one showing.
+  // A job's button in the rail is ringed while any of its tools is, unless one
+  // of them is open (it is lit then).
+  for (const b of document.querySelectorAll('#help-panel [data-dock]:is(.dock-tab, .dock-job)')) {
+    const key = b.dataset.dock;
+    const live = tools && !dockJobOn(key, showing)
+      && (DOCK_JOBS[key] ? dockJobKeys(key).some(dockToolLive)
+        : DOCK_FAMILIES[key] ? dockFamilyKeys(key).some(dockToolLive) : dockToolLive(key));
     if (b.classList.contains('is-live') !== live) b.classList.toggle('is-live', live);
     dockLiveTitle(b, live);
+    // A plain button's stand-in says what the real one says: pressed or not.
+    const real = b.classList.contains('dock-job') && dockMapItems.get(key);
+    if (real && real.kind !== 'panel' && real.el) {
+      const p = real.el.getAttribute('aria-pressed');
+      if (p === null) b.removeAttribute('aria-pressed');
+      else if (b.getAttribute('aria-pressed') !== p) b.setAttribute('aria-pressed', p);
+    }
   }
+  syncMapLookBtn(showing);
   // ⛰️: gold while its pane is the one showing, ringed while the map is in 3-D
   // behind another pane or none. In the map's corner it is the corner's split
   // button, lit while 3-D is on.
   const on3d = typeof Map3D !== 'undefined' && Map3D.active();
   for (const b of document.querySelectorAll('.mn-map-3d')) {
-    const inStrip = strip.contains(b);
+    // In the strip, or on the map beside a side panel that holds its settings
+    // (`corner: true` since the rail went by job): either way it opens a pane.
+    const inStrip = strip.contains(b) || dockHas('map-3d');
     const open = inStrip && showing === 'map-3d';
     const lit = inStrip ? open : on3d;
     const live = inStrip && on3d && !open;
@@ -3360,32 +3721,6 @@ function dockTabEl(strip, it) {
     if (it.entry) it.entry.tab = b;
   }
   return b;
-}
-
-// A section's heading, which folds it away: made once per section and kept on
-// its group, so that the heading just pressed keeps its focus. A fold leaves
-// the section's open pane and armed mode on show, so whatever is lit is never
-// folded out of sight (styles.css).
-function dockFoldEl(box, g, folded) {
-  let b = box.querySelector(':scope > .dock-fold');
-  if (!b) {
-    b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'dock-fold';
-    b.setAttribute('onclick', `toggleDockFold('${g.name}')`);
-    b.innerHTML = `<span class="dock-fold-name">${esc(g.label)}</span>`
-      + '<svg class="dock-fold-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
-  }
-  b.setAttribute('aria-expanded', String(!folded));
-  b.title = folded ? `Show ${g.label}` : `Fold ${g.label} away`;
-  return b;
-}
-
-function toggleDockFold(name) {
-  if (state.dockFolded.has(name)) state.dockFolded.delete(name);
-  else state.dockFolded.add(name);
-  try { localStorage.setItem('mn-dock-fold', [...state.dockFolded].join(',')); } catch (_) {}
-  renderDock();
 }
 
 // 🧹 Clear the selection (clearStationsMapSelection): made once and kept, so
@@ -3514,6 +3849,8 @@ function setDockTab(id, opts = {}) {
 // pane is opened, never on a repaint: a rail somebody scrolled down to reach
 // ⛶ stays where they put it.
 function dockTabInView(id) {
+  const job = dockJobOf(id);
+  if (DOCK_JOBS[job]) id = job;
   const strip = document.querySelector('#help-panel .dock-strip');
   const tab = strip && strip.querySelector(`.dock-tab[data-dock="${CSS.escape(id)}"]`);
   if (!tab || !tab.getClientRects().length || strip.scrollHeight <= strip.clientHeight) return;
@@ -5113,6 +5450,21 @@ function syncMapFullEsc() {
 // Rebuilt with the map, on every render of the tab: initMap() calls this after
 // addBaseLayers() and before the modules attach.
 function stationsMapPanels(map) {
+  // 🗺️ Map look: the one button for everything about how the map is drawn —
+  // Layers, Imagery over time, the Legend and Latency & signal — on the map it
+  // changes rather than in the side panel's rail. Their panes are still the
+  // side panel's, with a row of tabs between them (app.js, syncDockSubnav);
+  // this opens the one showed last. Like ↺ it is built to stay in the corner
+  // (`corner: true`), and so are 🔍 and ⛰️ below it.
+  MapChrome.button(map, {
+    className: 'mn-map-look', icon: Glyphs.rail('layers'), name: 'Map look',
+    title: 'Map look — base maps and layers, imagery over time, the legend, and colouring the pins by latency or signal',
+    ariaLabel: 'Map look — layers, imagery over time, the legend, latency and signal',
+    // Only beside a side panel that takes the panes it opens: a map whose host
+    // keeps its panels in the corner (never, in the app) has them there.
+    group: 'show', order: 5, corner: true, hidden: !dockAcceptsPanels(),
+    onClick: () => openMapLook(),
+  });
   // ── What the map shows ─────────────────────────────────────────────────────
   // The base maps were an icon of their own (🗺️ Base map, show/10) until they
   // became a blend rather than a choice; they are the first section of Map
@@ -5206,7 +5558,7 @@ function stationsMapPanels(map) {
     className: 'mn-map-magnify', icon: Glyphs.rail('magnify'), name: 'Magnifier',
     title: 'Magnifier — a glass over the map showing the ground under the pins, names and radio paths, closer up: the pins as small dots, their names faint, and the property lines, roads and rivers the map is drawing kept. Shift + scroll changes how close; Esc puts it away',
     ariaLabel: 'Magnifier — shows the ground under the pins, names and lines, closer up, the pins as small dots',
-    group: 'tools', order: 40, pressed: MapMagnify.on(),
+    group: 'tools', order: 40, pressed: MapMagnify.on(), corner: true,
     onClick: () => MapMagnify.toggle(),
   });
 
@@ -5239,7 +5591,7 @@ function stationsMapPanels(map) {
     title: '3-D view — tilt the map and see the ground it is drawn on, with its settings beside it. '
          + 'Pressed again it puts the settings away or brings them back; Leave 3-D is in them',
     ariaLabel: '3-D view — tilt the map and see the ground it is drawn on, with its settings beside it',
-    group: '3d', order: 10, pair: '3d', pressed: Map3D.active(),
+    group: '3d', order: 10, pair: '3d', pressed: Map3D.active(), corner: true,
     onClick: () => toggleStations3d(),
   });
   MapChrome.panel(map, {
@@ -5267,13 +5619,13 @@ function stationsMapPanels(map) {
   MapChrome.button(map, {
     className: 'mn-map-north', icon: Map3D.northIcon(0), name: 'Face north',
     title: 'Face north again', hidden: true,
-    group: '3d', order: 30,
+    group: '3d', order: 30, corner: true,
     onClick: () => Map3D.resetNorth(),
   });
   MapChrome.button(map, {
     className: 'mn-map-tilt', icon: Map3D.tiltIcon(0), name: 'Look straight down',
     title: 'Look straight down', hidden: true,
-    group: '3d', order: 40,
+    group: '3d', order: 40, corner: true,
     onClick: () => Map3D.resetTilt(),
   });
 
@@ -6702,9 +7054,9 @@ function maybeShowMapLayersHint() {
   mapNote(isPhoneNav()
     ? 'Tip: ⋮ at the top right opens the station list, the filters and the map’s tools.'
     : lookUsesCalmShell()
-      ? 'Tip: the map starts quiet. Layers, in the side panel’s rail on the right, turns on waterways, survey marks, '
+      ? 'Tip: the map starts quiet. Map look, the top button on the right of the map, turns on waterways, survey marks, '
         + 'wind regions, property boundaries, contours and ACMA licences, and mixes the base maps.'
-      : 'Tip: Layers, in the side panel’s rail on the right, mixes the base maps and has more '
+      : 'Tip: Map look, the top button on the right of the map, mixes the base maps and has more '
         + 'layers — survey marks, LiDAR contours, wind regions, ACMA licences, line of sight.', mapLayersHintUntil - now);
 }
 

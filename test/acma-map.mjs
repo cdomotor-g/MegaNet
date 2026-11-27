@@ -42,6 +42,7 @@ import { readFileSync } from 'node:fs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -72,7 +73,7 @@ await page.evaluate(() => switchTab('stations'));
 await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
 await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
 
-await page.click('#help-panel .dock-tab[data-dock="map-acma"]');
+await pressDock(page, 'map-acma');
 await page.waitForFunction(() => MapAcma.loaded(), null, { timeout: LOAD_TIMEOUT });
 await page.waitForTimeout(400);
 
@@ -89,7 +90,8 @@ const panel = await page.evaluate(() => {
     shown: !!(body && body.getClientRects().length), showing: dockShowing(),
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-acma')?.closest('.dock-group')?.dataset.group,
-    afterCompare: at('[data-dock="map-acma"]') === at('[data-dock="map-repcompare"]') + 1,
+    // Last in 📻 Radio's list since the rail went by job, after the comparison.
+    job: dockJobOf('map-acma'), radio: dockJobKeys('radio'),
     status: (document.getElementById('acmalic-status')?.textContent || '').replace(/\s+/g, ' '),
     words: document.querySelectorAll('.lic-panel > .bestrep-words dt').length,
     terms: [...document.querySelectorAll('.lic-panel .term, .lic-panel .term-chip')].map(e => [e.textContent.trim(), (e.getAttribute('title') || '').length]),
@@ -99,7 +101,8 @@ const panel = await page.evaluate(() => {
 });
 ok('📜 ACMA licences is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-acma' && panel.title === 'ACMA licences', J({ ...panel, terms: 0, summary: 0 }));
-ok('…in the tools group, straight after the repeater comparison', panel.group === 'tools' && panel.afterCompare, J(panel.group));
+ok('…in Radio\'s list, straight after the repeater comparison', panel.job === 'radio'
+   && panel.radio.indexOf('map-acma') === panel.radio.indexOf('map-repcompare') + 1, J(panel));
 ok('it says how many licences of how many holders, and the day the register copy was made',
    panel.status.includes(`${FILE.licences.length} licences of ${FILE.holders.length} holders`) && /\d{1,2} [A-Z][a-z]{2} \d{4}/.test(panel.status), panel.status);
 ok('the register copy read is the committed one, whole',

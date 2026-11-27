@@ -94,6 +94,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { PostgrestStub } from './lib/postgrest-stub.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -278,18 +279,20 @@ try {
   await page.waitForTimeout(300);
   const off0 = await page.evaluate(() => ({
     on: MapLatency.on(), tagged: state.mapMarkers.filter(m => m.mnLatency).length,
-    strip: [...document.querySelectorAll('#help-panel .dock-strip .dock-tab')].map(b => b.dataset.dock),
+    // Map look's tabs, in order (app.js, DOCK_LOOK): what the map shows is
+    // one button on the map since the rail went by job.
+    strip: dockJobKeys('look'),
   }));
   check('off on a first visit: no pin wears a band, and no reading is fetched for it',
     off0.on === false && off0.tagged === 0 && count('window') === 0, J({ off0, window: count('window') }));
   check('…and no message animated: the log is not watched',
     !(await page.evaluate(() => MapLatency.anim())) && count('live') === 0, J({ live: count('live') }));
-  check('⏱️ stands in the strip after 🔑, among what the map shows',
+  check('⏱️ is a tab of 🗺️ Map look, after 🔑, among what the map shows',
     off0.strip.indexOf('map-latency') === off0.strip.indexOf('map-legend') + 1, J(off0.strip));
 
   // ── 3. Opening the tool ───────────────────────────────────────────────
   log('\n3. Opening ⏱️ Latency\n');
-  await page.click('#help-panel .dock-tab[data-dock="map-latency"]');
+  await pressDock(page, 'map-latency');
   check('the first opening turns the view on', await waitTrue(page, () => MapLatency.on()));
   const anim0 = await waitTrue(page, () => MapLatency.anim() && MapLatency._live().status === 'ok' && MapLatency._live().watching);
   const live0 = await page.evaluate(() => ({
@@ -1137,7 +1140,7 @@ try {
     roles: /Field Station/.test(document.getElementById('map-legend').textContent) }));
   check('switched off, the pins and the legend are back in their roles', back.tagged === 0 && back.roles, J(back));
   await page.evaluate(() => { setDockTab('stations', { instant: true }); });
-  await page.click('#help-panel .dock-tab[data-dock="map-latency"]');
+  await pressDock(page, 'map-latency');
   await page.waitForTimeout(300);
   check('opening the pane again in the same session leaves a view turned off, off', await page.evaluate(() => !MapLatency.on()));
 
@@ -1173,7 +1176,7 @@ try {
     const p = await open(ctx);
     await loaded(p);
     await toStations(p);
-    await p.click('#help-panel .dock-tab[data-dock="map-latency"]');
+    await pressDock(p, 'map-latency');
     await settled(p);
     await p.waitForTimeout(300);
     const down = await p.evaluate(() => ({

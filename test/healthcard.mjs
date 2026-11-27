@@ -73,6 +73,7 @@ import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { PostgrestStub } from './lib/postgrest-stub.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -453,7 +454,7 @@ try {
   // ── 4. The pins ───────────────────────────────────────────────────────
   log('\n4. Colour pins by health — one request for the whole network\n');
   await page.evaluate(() => closeStnCard(false));
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(300);
   await press(page, '#dock-pane-map-display #map-display-block input[onchange^="HealthGlance.setPins"]');
   await waitTrue(page, () => HealthGlance._state().net.status === 'ok'
@@ -554,10 +555,10 @@ try {
   const theme = await page.evaluate(id => ({ dark: state.mapMarkers.find(x => x.mnStationId === id).options.fillColor }), R.silent);
   check('the pins keep their colours across a theme change — the base maps do not go dark', theme.dark === '#c7401a', J(theme));
 
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]').catch(() => {});
+  await pressDock(page, 'map-display').catch(() => {});
   await page.waitForTimeout(300);
   if (!(await page.isVisible('#dock-pane-map-display #map-display-block input[onchange^="HealthGlance.setPins"]'))) {
-    await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+    await pressDock(page, 'map-display');
     await page.waitForTimeout(300);
   }
   await press(page, '#dock-pane-map-display #map-display-block input[onchange^="HealthGlance.setPins"]');
@@ -949,7 +950,7 @@ try {
     await press(p, `#mn-health-card-${R.flatline} button[onclick^="HealthGlance.retry"]`);
     check('Try again, with the datastore back, answers',
       await waitTrue(p, id => /Watch/.test((document.querySelector(`#mn-health-card-${id} .hg-badge`) || {}).textContent || ''), R.flatline));
-    await press(p, '#help-panel .dock-tab[data-dock="map-display"]');
+    await pressDock(p, 'map-display');
     await p.waitForTimeout(300);
     await press(p, '#dock-pane-map-display button[onclick^="HealthGlance.askAgain"]');
     const followed = await waitTrue(p, id => HealthGlance._state().net.status === 'ok'

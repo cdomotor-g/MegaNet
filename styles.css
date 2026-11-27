@@ -13869,6 +13869,150 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   padding: var(--sp-2);
 }
 
+/* 📻 Radio and 🚩 Site (app.js, DOCK_JOBS): a pane that is a list of a job's
+   tools, each a full-width button with its name, what it does and what it
+   needs picked first — so nobody opens a tool to find out what it is for. */
+.dock-pane-jobs {
+  padding: var(--sp-3) var(--sp-2) var(--sp-4);
+}
+
+.dock-jobs-title {
+  margin: 0 0 var(--sp-1);
+  font-size: 1.15rem;
+}
+
+.dock-jobs-lead {
+  margin: 0 0 var(--sp-3);
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+.dock-jobs-list {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.dock-job {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .55rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.dock-job:hover {
+  border-color: var(--accent);
+  background: var(--subtle);
+}
+
+.dock-job.is-live,
+.dock-job[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.dock-job-ico {
+  flex: 0 0 auto;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.dock-job-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dock-job-name {
+  font-weight: 600;
+  font-size: .95rem;
+}
+
+.dock-job-what {
+  color: var(--muted);
+  font-size: .85rem;
+  line-height: 1.35;
+}
+
+.dock-job-needs {
+  justify-self: start;
+  margin-top: 3px;
+  padding: 0 .45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+/* The row at the top of a job's pane (app.js, syncDockSubnav): 🗺️ Map look's
+   tabs between its panes, or "← All radio tools" back to the list. It stands
+   at the top of the pane as the pane scrolls under it. */
+.dock-subnav {
+  position: sticky;
+  top: calc(-1 * var(--sp-2));
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2)) var(--sp-2);
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-sub);
+}
+
+.dock-subnav-title {
+  flex: 1 0 100%;
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+#help-panel .dock-panes .dock-subnav .dock-tab {
+  width: auto;
+  height: auto;
+  min-height: 2.25rem;
+  gap: .4rem;
+  padding: .2rem .6rem;
+  border-color: var(--border);
+  color: var(--text);
+  font-size: .85rem;
+}
+
+#help-panel .dock-subnav .dock-name {
+  display: inline;
+}
+
+#help-panel .dock-panes .dock-subnav .dock-tab.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.dock-back {
+  min-height: 2.25rem;
+  padding: .2rem .5rem;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: .9rem;
+}
+
+.dock-back:hover {
+  background: var(--subtle);
+}
+
 /* The strip. A column of 44 px square buttons (EPIC #107's floor) on a tint of
    its own, so the pane beside it reads as the thing that is open and the strip
    as what opens it.

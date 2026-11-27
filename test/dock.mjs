@@ -14,12 +14,12 @@
 //   1. **Where a fresh visit lands.** On the Stations tab at 1440 the cards are
 //      in the side panel and showing, and ❔ says Help is not; on any other tab
 //      the panel is shut, because the pane it prefers is not there.
-//   2. **The map's controls are in the strip, from the first render — all but
-//      ↺.** Every panel MapChrome builds for the Stations map is a pane with a
-//      button of its own, every other plain button is in the strip itself, in
-//      the corner's groups and order with a gap between groups, the camera pair
-//      is hidden, no pin is on screen — and the map's top-right corner holds ↺
-//      and nothing else, at its top right. Building the map opened nothing.
+//   2. **The rail by job, from the first render.** 📍 Stations, 🔎 Places, 📻
+//      Radio and 🚩 Site, then 🧹, ⛶ and ❔; Radio's and Site's panes list their
+//      tools; every panel MapChrome builds for the Stations map is a pane, no
+//      pin is on screen — and the map's top-right corner holds 🗺️ Map look, 🔍,
+//      ⛰️ (its camera pair hidden while flat) and ↺. Building the map opened
+//      nothing.
 //   3. **Panes and buttons.** Help and back, the map's panes opened from their
 //      buttons and working to a real pointer, and the showing pane's own button
 //      shutting the panel — measured as the map getting the width, and as
@@ -83,6 +83,7 @@
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -104,27 +105,26 @@ const CARD_IDS = ['stations-cards', 'stations-filter-card', 'stations-list-card'
 const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-draw-panel', 'map-3d-panel-body', 'sites-run', 'polar-status',
                    'reloc-run'];
 
-// The strip, top to bottom — the Stations tab's rail (app.js, dockStripGroups):
-// the names toggle (a desktop's alone); Stations & places (📍 the cards, Find a
-// place, 〽️ the path tools, 🧊 the digital twin's pane — 🔭 the AR station
-// finder's was a fifth until it became the Look Around tab); Map — the
-// corner's `show` group, then its `3d`: ⛰️ and its camera pair, the 3-D
-// settings a pane ⛰️ opens with no button of its own — and Tools, the
-// corner's `tools`, in their declared order; and the foot — 🧹 Clear the
-// selection, the corner's `screen` group, and ❔ last. Each section leads with
-// its heading, a button drawn only with the names on ('dock-fold'). Panes are
-// 'map-<id>', plain buttons their class.
-// Not ↺ (the reset group's one button): it is built to stay in the map's
-// corner (`corner`), and is asserted there.
-const STRIP = ['dock-names',
-               'dock-fold', 'stations', 'places', 'paths', 'twin',
-               'dock-fold', 'map-display', 'map-history', 'map-legend', 'map-latency', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt',
-               'dock-fold', 'map-draw', 'map-polar', 'map-dig', 'map-sites', 'map-relocate', 'map-bestrep', 'map-repcompare', 'map-acma', 'map-riverscout', 'mn-map-here', 'mn-map-magnify',
-               'mn-map-clear', 'mn-map-full',
-               'help'];
+// The strip, top to bottom — the Stations tab's rail by job (app.js,
+// dockStripGroups): the names toggle (a desktop's alone); 📍 Stations, 🔎
+// Places, 📻 Radio and 🚩 Site; and the foot — 🧹 Clear the selection, the
+// corner's `screen` group (⛶), and ❔ last. Panes are their keys, plain buttons
+// their class. Radio's and Site's tools are lists in their panes (JOBS), and
+// what the map shows is 🗺️ Map look on the map (CORNER).
+const STRIP = ['dock-names', 'stations', 'places', 'radio', 'site', 'mn-map-clear', 'mn-map-full', 'help'];
+// The plain buttons the strip holds itself.
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
-// The rail's groups, top to bottom: the toggle's, the three sections, the foot.
-const STRIP_GROUPS = ['rail', 'places', 'show', 'tools', 'foot'];
+// The rail's groups, top to bottom: the toggle's, the jobs, the foot.
+const STRIP_GROUPS = ['rail', 'jobs', 'foot'];
+// What each job's pane lists, top to bottom: panes by key, a family by its
+// name, a plain button by `btn-<class>`.
+const JOBS = {
+  radio: ['map-bestrep', 'map-polar', 'paths', 'better', 'map-repcompare', 'map-acma'],
+  site: ['map-dig', 'btn-mn-map-here', 'map-draw', 'twin'],
+};
+// The map's top-right corner, top to bottom: 🗺️ Map look, 🔍, ⛰️ and its
+// camera pair (hidden while the map is flat), and ↺.
+const CORNER = ['mn-map-look', 'mn-map-magnify', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt', 'mn-map-reset'];
 
 const server = await startServer();
 const browser = await launchBrowser();
@@ -167,7 +167,10 @@ try {
       leafletW: state.map ? state.map.getSize().x : null,
       mapClientW: map ? map.clientWidth : null,
       strip: btns.map(key),
-      expanded: Object.fromEntries(btns.filter(b => b.dataset.dock).map(b => [b.dataset.dock, b.getAttribute('aria-expanded')])),
+      // The rail's buttons and the tabs at the top of a pane (Map look's, a
+      // family's): every button that says whether its pane is open.
+      expanded: Object.fromEntries([...btns, ...panel.querySelectorAll('.dock-subnav .dock-tab')].filter(b => b.dataset.dock)
+        .map(b => [b.dataset.dock, b.getAttribute('aria-expanded')])),
       help: document.querySelector('#help-panel .help-toggle')?.getAttribute('aria-expanded'),
       cardsIn: (() => { const c = document.getElementById('stations-cards');
         return !c ? null : c.closest('#help-panel') ? 'dock' : c.closest('#main-content') ? 'main' : '?'; })(),
@@ -240,10 +243,12 @@ try {
     }
     return { items, pseudo, reset };
   });
-  // …and the answer every width is held to: ↺ alone, at the map's top right,
-  // under the pointer, named, and a one-shot button rather than a mode.
-  const resetAlone = (k) => !k.missing && JSON.stringify(k.items) === '["mn-map-reset"]' && k.pseudo === 0
-    && !!k.reset && k.reset.dx >= 0 && k.reset.dx <= 12 && k.reset.dy >= 0 && k.reset.dy <= 12
+  // …and the answer every width is held to: 🗺️ Map look, 🔍, ⛰️ and ↺ (the
+  // camera pair hidden while the map is flat), ↺ last, at the map's right
+  // edge, under the pointer, named, and a one-shot button rather than a mode.
+  const cornerHolds = (k) => !k.missing
+    && JSON.stringify(k.items) === JSON.stringify(CORNER.filter(c => !/north|tilt/.test(c)))
+    && !!k.reset && k.reset.dx >= 0 && k.reset.dx <= 12 && k.reset.dy >= 0
     && k.reset.hit && /reset/i.test(k.reset.label || '') && k.reset.pressed === null;
 
   // ── 1. A fresh visit ─────────────────────────────────────────────────────
@@ -251,7 +256,7 @@ try {
   check('a fresh visit opens the side panel on the Stations cards, at 1440',
     s.showing === 'stations' && s.cardsIn === 'dock' && !s.collapsed, JSON.stringify(s));
   check('…the elevation profile and the link budget are not among them but in a pane of their own',
-    s.pathsIn === 'paths' && s.expanded.paths === 'false', JSON.stringify({ pathsIn: s.pathsIn, expanded: s.expanded }));
+    s.pathsIn === 'paths' && s.expanded.radio === 'false', JSON.stringify({ pathsIn: s.pathsIn, expanded: s.expanded }));
   check('…and ❔ says Help is not the pane showing, 📍 that Stations is',
     s.help === 'false' && s.expanded.stations === 'true', JSON.stringify(s.expanded));
   check('every card id and every panel id is on the page exactly once',
@@ -285,8 +290,12 @@ try {
   check('…and so does the path tools\' pane', shape.pathsH2);
 
   // ── 2. The map's controls, in the strip — all but ↺ ────────────────────────
-  check('the strip holds every one of the map\'s controls but ↺, in the corner\'s order, from the first render',
+  check('the strip holds the four jobs and the foot, from the first render',
     JSON.stringify(s.strip) === JSON.stringify(STRIP), JSON.stringify(s.strip));
+  const jobs = await page.evaluate(() => Object.fromEntries(['radio', 'site'].map(j => [j,
+    [...document.querySelectorAll(`#dock-pane-${j} .dock-jobs-list > .dock-job`)].map(b => b.dataset.dock)])));
+  check('…and Radio\'s and Site\'s panes list their tools, in order, each a named button',
+    JSON.stringify(jobs) === JSON.stringify(JOBS), JSON.stringify(jobs));
   const panels = {};
   for (const id of ['display', 'legend', 'latency', 'draw', 'polar', 'sites', 'relocate', 'bestrep', 'repcompare', 'acma', 'riverscout', '3d']) panels[id] = await wrapAt(id);
   check('every panel is a pane of the side panel, whole, one of each',
@@ -300,13 +309,15 @@ try {
     const all = [...document.querySelectorAll('.' + c)];
     const b = all[0];
     return { c, n: all.length, inStrip: !!(b && b.closest('#help-panel .dock-strip')),
+             inCorner: !!(b && b.closest('#leaflet-map .mn-mapbar')), inSite: !!(b && b.closest('#dock-pane-site')),
              shown: !!(b && b.getClientRects().length), pressed: b ? b.getAttribute('aria-pressed') : null };
-  }), BUTTONS);
-  check('every plain button is in the strip itself, one of each, still wearing its own class',
-    buttons.every(b => b.n === 1 && b.inStrip), JSON.stringify(buttons));
-  check('…the camera pair is not on screen while the map is flat',
-    buttons.filter(b => /north|tilt/.test(b.c)).every(b => !b.shown)
-      && buttons.filter(b => !/north|tilt/.test(b.c)).every(b => b.shown), JSON.stringify(buttons));
+  }), [...BUTTONS, 'mn-map-here', ...CORNER.filter(c => c !== 'mn-map-reset' && c !== 'mn-map-look')]);
+  check('every plain button is where it belongs, one of each, still wearing its own class — 🧹 and ⛶ in the strip, ℹ️ kept in Site\'s pane, 🔍 ⛰️ and the camera pair on the map',
+    buttons.every(b => b.n === 1 && (BUTTONS.includes(b.c) ? b.inStrip : b.c === 'mn-map-here' ? b.inSite : b.inCorner)),
+    JSON.stringify(buttons));
+  check('…the camera pair is not on screen while the map is flat, nor ℹ️ itself (its stand-in in Site\'s list is)',
+    buttons.filter(b => /north|tilt|here/.test(b.c)).every(b => !b.shown)
+      && buttons.filter(b => !/north|tilt|here/.test(b.c)).every(b => b.shown), JSON.stringify(buttons));
   check('…the toggles say whether they are on, the one-shot buttons do not',
     ['mn-map-here', 'mn-map-magnify', 'mn-map-3d', 'mn-map-full'].every(c => ['true', 'false'].includes(buttons.find(b => b.c === c).pressed))
       && ['mn-map-north', 'mn-map-tilt'].every(c => buttons.find(b => b.c === c).pressed === null),
@@ -325,21 +336,11 @@ try {
   // `tools` are sections of their own, `3d` stands last in `show`'s, and
   // `screen` is in the foot.
   const known = await page.evaluate(() => Object.keys(MapChrome.groups()));
-  check('the rail\'s groups stand toggle, Stations & places, Map, Tools, foot — each but the toggle\'s a labelled group',
+  check('the rail\'s groups stand toggle, jobs, foot — each but the toggle\'s a labelled group',
     JSON.stringify(groups.map(g => g.name)) === JSON.stringify(STRIP_GROUPS)
       && JSON.stringify(known) === JSON.stringify(['show', 'tools', '3d', 'screen', 'reset'])
       && groups.slice(1).every(g => g.role === 'group' && /\S/.test(g.label || '')) && groups[0].role === null,
     JSON.stringify(groups.map(g => [g.name, g.role, g.label])));
-  // The sections, top to bottom, by their gaps; not the toggle's group, which
-  // is the rail's own and wears no hairline, nor the foot, which stands at the
-  // rail's foot whatever is above it (below).
-  const inside = [], between = [];
-  const vis = groups.filter(g => g.items.length && g.name !== 'rail' && g.name !== 'foot');
-  for (const g of vis) for (let i = 1; i < g.items.length; i++) inside.push(g.items[i].top - g.items[i - 1].bottom);
-  for (let i = 1; i < vis.length; i++) between.push(vis[i].items[0].top - vis[i - 1].items[vis[i - 1].items.length - 1].bottom);
-  check('…with every gap between two groups wider than every gap inside one',
-    between.length === 2 && Math.min(...between) > Math.max(...inside) + 6,
-    JSON.stringify({ inside, between }));
   const footAt = await page.evaluate(() => {
     const strip = document.querySelector('#help-panel .dock-strip');
     const foot = strip.querySelector(':scope > .dock-group[data-group="foot"]');
@@ -351,8 +352,8 @@ try {
     Math.abs(footAt.foot - footAt.strip) <= 1 && footAt.sticky === 'sticky' && footAt.pad === `${footAt.h}px`,
     JSON.stringify(footAt));
   const corner = await cornerNow();
-  check('the map\'s top-right corner holds ↺ and nothing else, at its top right, under the pointer — no other icon, no hairline',
-    resetAlone(corner), JSON.stringify(corner));
+  check('the map\'s top-right corner holds 🗺️ Map look, 🔍, ⛰️ and ↺, top to bottom, ↺ under the pointer',
+    cornerHolds(corner), JSON.stringify(corner));
   const zoom = await page.evaluate(() => !!document.querySelector('#leaflet-map .leaflet-top.leaflet-left .leaflet-control-zoom')
     && document.querySelector('#leaflet-map .leaflet-control-zoom').getClientRects().length > 0);
   check('…while Leaflet\'s zoom stays on the map, top-left', zoom);
@@ -457,7 +458,7 @@ try {
   check('…and 📍 brings the cards back', s.showing === 'stations' && s.help === 'false', JSON.stringify(s));
   // 〽️, by a real pointer: the path tools at the same width, and the cards'
   // pane put away rather than scrolled past.
-  await page.click('#help-panel .dock-tab[data-dock="paths"]');
+  await pressDock(page, 'paths');
   await page.waitForTimeout(300);
   s = await look();
   const pathsSeen = await page.evaluate(() => ({
@@ -465,18 +466,18 @@ try {
     budget: document.getElementById('link-budget-panel').checkVisibility(),
     list: document.getElementById('stations-list-card').checkVisibility(),
   }));
-  check('〽️ opens the path tools — the elevation profile and the link budget — at the same width',
-    s.showing === 'paths' && s.expanded.paths === 'true' && s.expanded.stations === 'false' && s.panel.w === w0
+  check('Radio › Radio link opens the path tools — the elevation profile and the link budget — at the same width, 📻 lit',
+    s.showing === 'paths' && s.expanded.radio === 'true' && s.expanded.stations === 'false' && s.panel.w === w0
       && pathsSeen.profile && pathsSeen.budget && !pathsSeen.list, JSON.stringify({ s, pathsSeen }));
   await page.click('#help-panel .dock-tab[data-dock="stations"]');
   await page.waitForTimeout(300);
 
   // A map pane from its button, by a real pointer, and a real click inside it.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(300);
   let d = await wrapAt('display');
   s = await look();
-  check('🗺️ opens Map display as a pane of the side panel, at the same width',
+  check('🗺️ Map look on the map opens Layers as a pane of the side panel, at the same width, its tab lit',
     s.showing === 'map-display' && s.expanded['map-display'] === 'true' && d.shown && s.panel.w === w0,
     JSON.stringify({ s, d }));
   const arrowsBefore = await page.evaluate(() => state.mapArrows);
@@ -485,13 +486,13 @@ try {
   check('a real click inside it works', await page.evaluate(() => state.mapArrows) === !arrowsBefore,
     `arrows ${arrowsBefore} → ${await page.evaluate(() => state.mapArrows)}`);
   await page.evaluate(() => MapArrows.setEnabled(true));
-  await page.click('#help-panel .dock-tab[data-dock="map-sites"]');
+  await pressDock(page, 'map-sites');
   await page.waitForTimeout(250);
   await page.locator('#sites-paste').fill('Alstonville STP');
   check('the site finder\'s box takes typing in its pane',
     await page.evaluate(() => document.getElementById('sites-paste').value) === 'Alstonville STP');
   await page.locator('#sites-paste').fill('');
-  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await pressDock(page, 'map-draw');
   await page.waitForTimeout(250);
   await page.click('#map-draw-panel button:has-text("Line")');
   await page.waitForTimeout(250);
@@ -499,12 +500,14 @@ try {
     await page.evaluate(() => state.draw.tool));
   await page.evaluate(() => MapDraw.setTool(''));
   await page.waitForTimeout(150);
-  // A plain button in the strip does what it did on the map.
-  await page.click('#help-panel .dock-strip .mn-map-here');
+  // A plain button in a job's list does what it did on the map: its stand-in
+  // presses the real one, and says what the real one says.
+  await pressDock(page, 'btn-mn-map-here');
   await page.waitForTimeout(150);
-  const here = await page.evaluate(() => ({ armed: MapHere.armed(), pressed: document.querySelector('.mn-map-here').getAttribute('aria-pressed') }));
-  check('ℹ️ in the strip arms What is here, and says so', here.armed && here.pressed === 'true', JSON.stringify(here));
-  await page.click('#help-panel .dock-strip .mn-map-here');
+  const here = await page.evaluate(() => ({ armed: MapHere.armed(), pressed: document.querySelector('.mn-map-here').getAttribute('aria-pressed'),
+    standIn: document.querySelector('#help-panel .dock-job[data-dock="btn-mn-map-here"]').getAttribute('aria-pressed') }));
+  check('Site › What\'s here? arms What is here, and says so', here.armed && here.pressed === 'true' && here.standIn === 'true', JSON.stringify(here));
+  await pressDock(page, 'btn-mn-map-here');
   await page.waitForTimeout(150);
   check('…and pressed again disarms it', await page.evaluate(() => !MapHere.armed()));
 
@@ -640,7 +643,7 @@ try {
   // A render inside the tab re-emits every card while the old ones are in the
   // side panel, and builds a new map with new controls — the moment a duplicate
   // would be born, and the moment a pane could flicker shut or lose its place.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(300);
   // Scrolled part-way down, the way somebody working in it leaves it.
   await page.mouse.move(1200, 500);
@@ -722,7 +725,7 @@ try {
   check('…and focus on ↺, in the map\'s corner, lands on the new map\'s ↺',
     /mn-map-reset/.test(resetFocus.cls || '') && resetFocus.fresh && resetFocus.inCorner, JSON.stringify(resetFocus));
   // The pane last open is the pane that opens when the tab comes back.
-  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await pressDock(page, 'map-draw');
   await page.waitForTimeout(250);
   await page.evaluate(() => switchTab('passranges'));
   await page.waitForTimeout(300);
@@ -772,8 +775,8 @@ try {
       && f.topRight === 'side' && f.topLeft === 'map' && f.midSide === 'side', JSON.stringify(f));
   check('…and the map re-measured to its new size', f.leafletW === f.mapClientW, JSON.stringify(f));
   const fullCorner = await cornerNow();
-  check('…with ↺ still alone at the top right of the full-screen map, under the pointer',
-    resetAlone(fullCorner), JSON.stringify(fullCorner));
+  check('…with the corner\'s buttons still at the top right of the full-screen map, ↺ under the pointer',
+    cornerHolds(fullCorner), JSON.stringify(fullCorner));
   // The walls place every Tab themselves, so they have to stop wherever the
   // browser would — a <summary> included, or no disclosure beside a
   // full-screen map could be opened or shut from the keyboard. With the
@@ -794,13 +797,13 @@ try {
   await page.evaluate(() => setStationFiltersOpen(false));
   // The side panel works in full screen: a pane changes, the panel shuts and
   // opens, the handle moves — and the map's edge follows each, re-measured.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(250);
   const fd = await wrapAt('display');
   f = await fullLook();
   check('in full screen a map pane opens from the strip, beside the map',
     f.full && f.showing === 'map-display' && fd.shown && Math.abs(f.mapRight - f.sideLeft) <= 1, JSON.stringify({ f, fd }));
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(250);
   f = await fullLook();
   check('…shutting the side panel gives the map the width at once, re-measured',
@@ -948,7 +951,7 @@ try {
   // opens the whole model in a window. So finishing the line leaves the ✏️
   // pane where it is (it used to give way to 〽️ Path tools), and focus, which
   // was on Finish line, goes to the new line's row rather than to <body>.
-  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await pressDock(page, 'map-draw');
   await page.waitForTimeout(250);
   await page.locator('#map-draw-panel .draw-tool', { hasText: 'Line' }).click();
   const mb = await page.evaluate(() => { const r = document.getElementById('leaflet-map').getBoundingClientRect();
@@ -977,7 +980,7 @@ try {
   // Taking a station out shortens the list and keeps focus in the card;
   // Clear takes the card off the page with focus on something that is on it.
   // (The ✏️ pane is still up from the line above; its own button would shut it.)
-  if (await page.evaluate(() => dockShowing() !== 'map-draw')) await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  if (await page.evaluate(() => dockShowing() !== 'map-draw')) await pressDock(page, 'map-draw');
   await page.waitForTimeout(250);
   const selBefore = await page.evaluate(() => {
     const el = document.getElementById('map-draw-sel');
@@ -1152,7 +1155,7 @@ try {
     JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip, counts: s.counts }));
   check('…without forgetting which pane was open', s.pref === 'stations', JSON.stringify(s));
   const foldCorner = await cornerNow();
-  check('…and still ↺ alone in the map\'s corner, at its top right', resetAlone(foldCorner), JSON.stringify(foldCorner));
+  check('…and the map\'s corner still holding Map look, 🔍, ⛰️ and ↺', cornerHolds(foldCorner), JSON.stringify(foldCorner));
   // Back above it: the same map, the side panel open on the cards again, the
   // path tools in their own pane.
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -1161,8 +1164,9 @@ try {
   check('back above the fold the cards are in the side panel again, open on them, with the same Leaflet map',
     s.cardsIn === 'dock' && s.showing === 'stations' && await page.evaluate(() => state.map.__probe === 'same'),
     JSON.stringify(s));
-  check('…and the path tools back in their own pane', s.pathsIn === 'paths' && s.strip.includes('paths'),
-    JSON.stringify({ pathsIn: s.pathsIn, strip: s.strip }));
+  const radioLink = await page.evaluate(() => !!document.querySelector('#dock-pane-radio .dock-jobs-list > .dock-job[data-dock="paths"]'));
+  check('…and the path tools back in their own pane, listed under Radio again', s.pathsIn === 'paths' && radioLink,
+    JSON.stringify({ pathsIn: s.pathsIn, radioLink }));
   // …and folded again, which is where the phone below is entered from.
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
@@ -1186,13 +1190,13 @@ try {
   // its rail first — an expanded nav is a drawer over the page on a phone.
   await page.evaluate(() => setNavCollapsed(true));
   await page.waitForTimeout(300);
-  await page.focus('#help-panel .dock-tab[data-dock="map-draw"]');
+  await page.focus('#help-panel .dock-tab[data-dock="site"]');
   await page.setViewportSize({ width: 375, height: 700 });
   await page.waitForTimeout(600);
   const toPhone = await page.evaluate(() => ({ dock: document.activeElement?.dataset?.dock || null,
     inStrip: !!document.activeElement?.closest('#help-panel .dock-strip') }));
-  check('crossing to a phone with focus on ✏️ in the strip leaves it there, in the rail',
-    toPhone.dock === 'map-draw' && toPhone.inStrip, JSON.stringify(toPhone));
+  check('crossing to a phone with focus on 🚩 Site in the strip leaves it there, in the rail',
+    toPhone.dock === 'site' && toPhone.inStrip, JSON.stringify(toPhone));
   // Every button the strip has beside a desktop's map but the names toggle —
   // a phone's rail is always icons: the cards are a pane of the side panel on
   // a phone too, a drawer over the map.
@@ -1242,64 +1246,69 @@ try {
   // 36 px: a step under a desktop's 44, so the rail is less of the map and
   // its column fits a phone's height — and still half as big again as the
   // 24 px WCAG 2.2 sets as a target's least.
-  check('…holding ❔, 🧹, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
+  check('…holding the four jobs, 🧹, ⛶ and ❔, each 36 px square, and every one of the map\'s panels a pane',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
       && phone.panels.length === 14 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
   const phoneCorner = await cornerNow();
-  check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',
-    p.map.r <= p.panel.l && p.leafletW === p.mapClientW && resetAlone(phoneCorner), JSON.stringify({ p, phoneCorner }));
+  check('…the map ending where the rail begins, measured to it, and the corner\'s buttons on it, at its top right',
+    p.map.r <= p.panel.l && p.leafletW === p.mapClientW && cornerHolds(phoneCorner), JSON.stringify({ p, phoneCorner }));
   s = await look();
   check('…the cards in the side panel — the list in 📍\'s pane, the path tools in 〽️\'s — and nothing scrolling sideways',
     !phone.cards && s.cardsIn === 'dock' && s.pathsIn === 'paths' && !phone.sideways
       && [...CARD_IDS, ...PANEL_IDS].every(id => s.counts[id] === 1), JSON.stringify({ phone, cardsIn: s.cardsIn, pathsIn: s.pathsIn }));
 
-  // A panel from the rail, by the keyboard: a drawer beside the rail, over the
+  // A job from the rail, by the keyboard: a drawer beside the rail, over the
   // map, with the backdrop behind it — and the rail still lit above that
   // backdrop, its button the thing under a finger, and the map not moved.
-  await page.focus('#help-panel .dock-tab[data-dock="map-legend"]');
+  await page.focus('#help-panel .dock-tab[data-dock="radio"]');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(300);
   const shutP = p;
   p = await phoneLook();
-  check('Enter on 🔑 in the rail opens the legend as a drawer on the rail\'s inner edge, over the map',
-    p.showing === 'map-legend' && (await wrapAt('legend')).shown && Math.abs(p.drawer.r - p.panel.l) <= 1
+  check('Enter on 📻 Radio in the rail opens its list of tools as a drawer on the rail\'s inner edge, over the map',
+    p.showing === 'radio' && Math.abs(p.drawer.r - p.panel.l) <= 1
       && p.drawer.w > 250 && p.overMap === 'drawer', JSON.stringify(p));
   check('…with the backdrop behind it and the rail lit above that, its own button the thing under a finger',
-    p.backdrop && p.onTab === 'rail' && p.active === 'map-legend'
-      && await page.evaluate(() => document.querySelector('#help-panel .dock-tab[data-dock="map-legend"]').getAttribute('aria-expanded')) === 'true',
+    p.backdrop && p.onTab === 'rail' && p.active === 'radio'
+      && await page.evaluate(() => document.querySelector('#help-panel .dock-tab[data-dock="radio"]').getAttribute('aria-expanded')) === 'true',
     JSON.stringify(p));
   check('…and the map neither moved nor re-measured: a drawer takes no width',
     p.map.w === shutP.map.w && p.map.l === shutP.map.l && p.leafletW === shutP.leafletW, JSON.stringify({ shut: shutP.map, open: p.map }));
-  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await pressDock(page, 'map-draw');
   await page.waitForTimeout(250);
   p = await phoneLook();
-  check('another button in the rail switches the drawer to its panel',
+  check('🚩 Site in the rail, then Draw & measure in its list, switches the drawer to that panel',
     p.showing === 'map-draw' && (await wrapAt('draw')).shown && !(await wrapAt('legend')).shown && p.backdrop, JSON.stringify(p));
-  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  // 🚩, lit while one of its tools is open, goes back to its list; pressed
+  // again it puts the drawer away.
+  await page.click('#help-panel .dock-strip .dock-tab[data-dock="site"]');
+  await page.waitForTimeout(250);
+  const backToList = await page.evaluate(() => dockShowing());
+  await page.click('#help-panel .dock-strip .dock-tab[data-dock="site"]');
   await page.waitForTimeout(250);
   p = await phoneLook();
-  check('…and the lit one puts the drawer away, backdrop and all, focus staying on it',
-    p.showing === null && !p.backdrop && p.drawer === null && p.active === 'map-draw', JSON.stringify(p));
+  check('…and the lit 🚩 goes back to Site\'s list, then puts the drawer away, backdrop and all, focus staying on it',
+    backToList === 'site' && p.showing === null && !p.backdrop && p.drawer === null && p.active === 'site', JSON.stringify({ backToList, p }));
   // The backdrop: the finger's width of dimmed page beside the drawer.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(250);
   p = await phoneLook();
   const sliverAt = p.sliver;
   await page.mouse.click(6, p.map.t + p.map.h / 2);
   await page.waitForTimeout(250);
   p = await phoneLook();
-  check('a tap on the dimmed page beside the drawer puts it away, focus back on its button',
-    sliverAt === 'backdrop' && p.showing === null && !p.backdrop && p.active === 'map-display', JSON.stringify({ sliverAt, p }));
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  check('a tap on the dimmed page beside the drawer puts it away, focus back on the button that opened it — 🗺️ Map look',
+    sliverAt === 'backdrop' && p.showing === null && !p.backdrop && p.active === 'mn-map-look', JSON.stringify({ sliverAt, p }));
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(250);
   await page.focus('#map-display-find');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(250);
   p = await phoneLook();
-  check('…and so does Escape, from inside it', p.showing === null && !p.backdrop && p.active === 'map-display', JSON.stringify(p));
+  check('…and so does Escape, from inside it', p.showing === null && !p.backdrop && p.active === 'mn-map-look', JSON.stringify(p));
   // One drawer at a time, both ways round.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(200);
   await page.evaluate(() => setNavCollapsed(false));
   await page.waitForTimeout(250);
@@ -1334,7 +1343,7 @@ try {
   // drawer on the phone, a pane beside the map above it.
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.waitForTimeout(600);
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(250);
   await page.focus('#map-display-find');
   await page.keyboard.type('wind');
@@ -1480,11 +1489,11 @@ try {
     phoneFull.mapL === 0 && Math.abs(phoneFull.mapR - phoneFull.sideL) <= 1 && phoneFull.sideR === phoneFull.winW
       && phoneFull.sideT === 0 && phoneFull.sideH === phoneFull.winH && phoneFull.inRail && phoneFull.pressed === 'true'
       && phoneFull.leafletW === phoneFull.mapClientW, JSON.stringify(phoneFull));
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.click('#help-panel .dock-strip .dock-tab[data-dock="radio"]');
   await page.waitForTimeout(250);
   p = await phoneLook();
-  check('…a panel from the rail is a drawer over the full-screen map, the sliver of map beside it the backdrop',
-    p.showing === 'map-display' && p.overMap === 'drawer' && p.sliver === 'backdrop' && p.onTab === 'rail', JSON.stringify(p));
+  check('…a pane from the rail is a drawer over the full-screen map, the sliver of map beside it the backdrop',
+    p.showing === 'radio' && p.overMap === 'drawer' && p.sliver === 'backdrop' && p.onTab === 'rail', JSON.stringify(p));
   await page.mouse.click(6, p.map.t + p.map.h / 2);
   await page.waitForTimeout(250);
   p = await phoneLook();
@@ -1519,7 +1528,7 @@ try {
   const awayCorner = await cornerNow();
   check('⋮ puts the rail away: no width, nothing drawn, the map to the screen\'s edge and measured to it, focus on ⋮, and remembered',
     p.panel.w === 0 && p.strip.w === 0 && p.map.l === 0 && p.map.r === p.winW && p.leafletW === p.mapClientW
-      && side.expanded === 'false' && side.focused && side.stored === 'hidden' && resetAlone(awayCorner),
+      && side.expanded === 'false' && side.focused && side.stored === 'hidden' && cornerHolds(awayCorner),
     JSON.stringify({ p, side, awayCorner }));
   await page.click('#btn-side');
   await page.waitForTimeout(400);
@@ -1768,36 +1777,17 @@ try {
     check('a first visit at 1440 has the Stations rail wearing names, as wide as --mn-rail-names',
       r.names && r.stripW === 215 && r.toggle && r.toggle.shown && r.toggle.expanded === 'true', JSON.stringify(r));
     check('…every button in it named beside its icon, the name a part of what it is called',
-      r.labels.length > 15 && r.labels.every(l => l.name && l.label.includes(l.name.toLowerCase()))
-        && r.labels.some(l => l.k === 'map-display' && l.name === 'Layers')
+      r.labels.length === STRIP.length && r.labels.every(l => l.name && l.label.includes(l.name.toLowerCase()))
+        && r.labels.some(l => l.k === 'radio' && l.name === 'Radio')
         && r.labels.some(l => l.k === 'mn-map-clear' && l.name === 'Clear the selection'), JSON.stringify(r.labels));
-    check('…under three headings that fold, Stations & places, Map and Tools',
-      JSON.stringify(r.heads) === JSON.stringify([['Stations & places', 'true'], ['Map', 'true'], ['Tools', 'true']]),
-      JSON.stringify(r.heads));
+    check('…and no headings to fold: four jobs need none',
+      r.heads.length === 0, JSON.stringify(r.heads));
     check('…and the map measured to the rail it has', r.leafletW === r.mapClientW, JSON.stringify(r));
     check('…the foot at the rail\'s foot, and the strip keeping its height as scroll padding, so nothing scrolls under it unseen',
       Math.abs(r.footBottom - r.stripBottom) <= 1 && r.pad === `${r.footH}px`, JSON.stringify(r));
     check('under Tiles the open pane\'s tile is gilded and its row tinted; a shut one keeps its colour',
       /linear-gradient/.test(r.open?.img || '') && r.openBox.bg !== 'rgba(0, 0, 0, 0)'
         && r.shut?.img === 'none' && r.shut?.bg === 'rgb(11, 92, 171)', JSON.stringify({ open: r.open, shut: r.shut, box: r.openBox }));
-    // What's here, by its switch.
-    await page.click('#help-panel .dock-strip .mn-map-here');
-    await page.waitForTimeout(250);
-    const armed = await rail();
-    await page.click('#help-panel .dock-strip .mn-map-here');
-    await page.waitForTimeout(200);
-    check('a mode wears a switch with the names on, which moves when it is armed',
-      armed.here.sw && armed.here.pressed === 'true' && armed.here.knob !== 'none' && r.here.knob === 'none', JSON.stringify({ before: r.here, armed: armed.here }));
-    // A fold: Tools away and back.
-    await page.click('#help-panel .dock-group[data-group="tools"] > .dock-fold');
-    await page.waitForTimeout(200);
-    const folded = await rail();
-    await page.click('#help-panel .dock-group[data-group="tools"] > .dock-fold');
-    await page.waitForTimeout(200);
-    const unfolded = await rail();
-    check('a heading folds its section away, and back, remembered',
-      folded.tools === 0 && folded.folded === 'tools' && folded.heads[2][1] === 'false'
-        && unfolded.tools === 11 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
     // The toggle: icons alone, and back.
     const wide = r.mapW;
     await page.click('#help-panel .dock-names');
@@ -1883,7 +1873,9 @@ try {
 // pointer where it is drawn, and the bar stands beside them.
 const classic = await launchBrowser({ ignoreDefaultArgs: ['--hide-scrollbars'] });
 try {
-  const context = await classic.newContext({ viewport: { width: 1440, height: 550 }, rail: null });
+  // 330 tall: the rail by job is short enough to fit any laptop's window, so
+  // it takes a window this short to make it scroll at all.
+  const context = await classic.newContext({ viewport: { width: 1440, height: 330 }, rail: null });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   page.on('pageerror', (e) => errors.push(e.message));
@@ -1907,10 +1899,10 @@ try {
     return { scrolls: strip.scrollHeight > strip.clientHeight + 20, bar: strip.offsetWidth - strip.clientWidth,
              sideways: strip.scrollWidth > strip.clientWidth + 1, out };
   });
-  check('at 1440 × 550 the strip is taller than the window and scrolls, with a real scrollbar',
+  check('at 1440 × 330 the strip is taller than the window and scrolls, with a real scrollbar',
     tall.scrolls && tall.bar > 0, JSON.stringify({ scrolls: tall.scrolls, bar: tall.bar }));
   check('…every button in it can be scrolled to and is the thing under the pointer there',
-    tall.out.length === STRIP.length - 2 && tall.out.every(o => o.hit && o.inView), JSON.stringify(tall.out));
+    tall.out.length === STRIP.length && tall.out.every(o => o.hit && o.inView), JSON.stringify(tall.out));
   check('…and the scrollbar stands beside the buttons, not over them, with nothing scrolling sideways',
     tall.out.every(o => o.clear) && !tall.sideways, JSON.stringify({ bar: tall.bar, out: tall.out.filter(o => !o.clear) }));
   // And from the keyboard, End scrolls the strip to its last button.
@@ -1937,5 +1929,5 @@ if (failed.length) {
   for (const f of failed) console.log(`  ✗ ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
   process.exit(1);
 }
-console.log('PASS — one side panel: the cards, the help and every one of the map\'s controls but ↺, tabbed,');
-console.log('       resizable, beside the map in full screen, nothing left behind, and ↺ alone in the corner.');
+console.log('PASS — one side panel: the cards, the help and a rail by job — Stations, Places, Radio, Site —');
+console.log('       resizable, beside the map in full screen, nothing left behind, and Map look on the map.');

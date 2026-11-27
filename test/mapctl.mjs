@@ -64,6 +64,7 @@
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -478,19 +479,22 @@ try {
       at: r ? { dx: Math.round(m.right - r.right), dy: Math.round(r.top - m.top) } : null,
       panels: document.querySelectorAll('.mn-mapctl').length,
       panelsInSide: inSide('.mn-mapctl'),
-      buttonsInSide: inSide('.mn-map-here, .mn-map-3d, .mn-map-north, .mn-map-tilt, .mn-map-full'),
+      buttonsInSide: inSide('.mn-map-here, .mn-map-full'),
     };
   });
-  const alone = k => JSON.stringify(k.items) === '["mn-map-reset"]' && k.hairlines === 0 && !!k.at
-    && k.at.dx >= 0 && k.at.dx <= 12 && k.at.dy >= 0 && k.at.dy <= 12
+  // Since the rail went by job (app.js, DOCK_JOBS) the corner keeps what is
+  // about the map as a whole: 🗺️ Map look, 🔍, ⛰️ (its camera pair hidden
+  // while flat) and ↺ last, at the map's right edge.
+  const alone = k => JSON.stringify(k.items) === JSON.stringify(['mn-map-look', 'mn-map-magnify', 'mn-map-3d', 'mn-map-reset'])
+    && !!k.at && k.at.dx >= 0 && k.at.dx <= 12 && k.at.dy >= 0
     && k.panels === 14 && k.panelsInSide && k.buttonsInSide;
   const narrow = await cornerNow();
-  check('at a phone\'s width the Stations map\'s corner holds ↺ alone, at its top right, every other control in the side panel\'s rail',
+  check('at a phone\'s width the Stations map\'s corner holds Map look, 🔍, ⛰️ and ↺, every panel and the other buttons in the side panel\'s rail',
     alone(narrow), JSON.stringify(narrow));
   await page.setViewportSize({ width: 1440, height: 950 });
   await page.waitForTimeout(600);
   const wide = await cornerNow();
-  check('…and above it too, every other control in the side panel\'s strip',
+  check('…and above it too, every panel and the other buttons in the side panel',
     alone(wide), JSON.stringify(wide));
 
   // ── 10. The base maps are a blend, inside Map display ─────────────────────
@@ -513,7 +517,7 @@ try {
   // In the side panel, opened from its button in the strip: this section is
   // about what is in the panel, not about the corner it used to be pinned in,
   // and a pane shows all of it.
-  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await pressDock(page, 'map-display');
   await page.waitForTimeout(300);
   // Put each switch where this section wants it, by clicking it.
   const setBase = async (n, on) => {

@@ -87,7 +87,8 @@ function read() {
     glasses: glass.length,
     glassesAnywhere: document.querySelectorAll('.mn-magnify').length,
     btn: btn && { pressed: btn.getAttribute('aria-pressed'), inStrip: !!btn.closest('#help-panel .dock-strip'),
-                  group: btn.closest('.dock-group') ? btn.closest('.dock-group').dataset.group : null,
+                  inCorner: !!btn.closest('#leaflet-map .mn-mapbar'),
+                  group: btn.closest('.mn-mapbar-group') ? btn.closest('.mn-mapbar-group').dataset.group : null,
                   after: btn.previousElementSibling ? [...btn.previousElementSibling.classList].join(' ') : '',
                   label: btn.getAttribute('aria-label') || '', title: btn.title },
     size: { x: Math.round(r.width), y: Math.round(r.height) },
@@ -128,13 +129,15 @@ async function main() {
     await page.evaluate(() => state.map.setView([-27.47, 153.02], 12, { animate: false }));
     await settle(page);
     let S = await g();
-    check('a switch in the side panel\'s rail, in Tools, after What\'s here?',
-      S.btn && S.btn.inStrip && S.btn.group === 'tools' && /mn-map-here/.test(S.btn.after), J(S.btn));
+    // On the map since the rail went by job (app.js, `corner: true`): what the
+    // map is drawn with is looked for on the map, under 🗺️ Map look.
+    check('a switch on the map, in its corner\'s Tools group, under Map look',
+      S.btn && S.btn.inCorner && !S.btn.inStrip && S.btn.group === 'tools', J(S.btn));
     check('…called Magnifier, saying what it does, and off', S.btn && S.btn.pressed === 'false'
       && /^magnifier/i.test(S.btn.label) && /pins/.test(S.btn.title) && /Shift \+ scroll/.test(S.btn.title), J(S.btn));
     check('…and no glass anywhere until it is on', S.glassesAnywhere === 0 && !S.m.on, J(S.m));
 
-    await page.click('#help-panel .dock-strip .mn-map-magnify');
+    await page.click('#leaflet-map .mn-mapbar .mn-map-magnify');
     await page.waitForTimeout(300);
     S = await g();
     check('pressed: on, and one glass in the map\'s container', S.btn.pressed === 'true' && S.m.on && S.glasses === 1
@@ -293,7 +296,7 @@ async function main() {
     await settle(page);
 
     // ── Off ────────────────────────────────────────────────────────────────
-    await page.focus('#help-panel .dock-strip .mn-map-magnify');
+    await page.focus('#leaflet-map .mn-mapbar .mn-map-magnify');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(250);
     S = await g();
@@ -302,15 +305,15 @@ async function main() {
       J({ m: S.m, n: S.glassesAnywhere, cursor: S.cursor }));
     check('…and the map still in its own full screen state (one press, one thing)',
       await page.evaluate(() => !state.mapFullscreen));
-    await page.click('#help-panel .dock-strip .mn-map-magnify');
+    await page.click('#leaflet-map .mn-mapbar .mn-map-magnify');
     await page.waitForTimeout(200);
-    await page.click('#help-panel .dock-strip .mn-map-magnify');
+    await page.click('#leaflet-map .mn-mapbar .mn-map-magnify');
     await page.waitForTimeout(200);
     S = await g();
     check('the switch twice: on and off again, nothing left', !S.m.on && S.glassesAnywhere === 0 && S.btn.pressed === 'false', J(S.m));
 
     // ── The tab ────────────────────────────────────────────────────────────
-    await page.click('#help-panel .dock-strip .mn-map-magnify');
+    await page.click('#leaflet-map .mn-mapbar .mn-map-magnify');
     await page.waitForTimeout(200);
     await page.evaluate(() => initMap());
     await settle(page);

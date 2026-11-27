@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 294, date: '2026-11-27', items: [
+      '🧭 <strong>A tidier side panel on the Stations map.</strong> Its rail has four buttons now instead of twenty-five: '
+        + '<em>Stations</em>, <em>Places</em>, <em>Radio</em> and <em>Site</em>. <em>Radio</em> and <em>Site</em> each open a list of their tools, '
+        + 'every one saying what it does and what you need to pick first (a station, a spot, two points). Press the lit button again to go back to the list.',
+      '🗺️ <strong>Map look</strong> — Layers, Imagery over time, the Legend and Latency &amp; signal are one button on the map itself, top right, '
+        + 'with tabs between them. The Magnifier and the 3-D view are on the map under it.',
+      '🗼 <strong>Find a better site</strong> — Move/New Repeater, Relocate station and Riverside sites are one tool under <em>Radio</em> now, '
+        + 'with a tab for each: <em>Move or build a repeater</em>, <em>Move a station</em>, <em>Along a river</em>.',
+      '🔎 <strong>Search finds tools</strong> — type <em>dig</em>, <em>1980</em> or <em>best repeater</em> in the search box at the top, from any tab, '
+        + 'and the tool opens where it lives.',
+    ] },
     { n: 293, date: '2026-11-26', items: [
       '📡 <strong>Last hop in the Message Log</strong> — two new columns, <em>Last hop</em> and <em>Offset</em> (under <em>Columns</em>), say which repeater '
         + 'sent each copy of a reading on to the base station, told by its carrier offset, with that copy\'s SNR. A new <em>Last hop</em> filter keeps only the '

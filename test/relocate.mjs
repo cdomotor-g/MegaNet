@@ -61,6 +61,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
 import { hillyTerrariumPng } from './lib/terrarium.mjs';
 import { answer, asking } from './lib/ask.mjs';
+import { pressDock, reachDock } from './lib/dock-press.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -152,7 +153,7 @@ await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data &&
 await page.evaluate(() => switchTab('stations'));
 await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
 await page.waitForFunction(() => !state.map._animatingZoom, null, { timeout: LOAD_TIMEOUT });
-await page.click('#help-panel .dock-tab[data-dock="map-relocate"]');
+await pressDock(page, 'map-relocate');
 await page.waitForTimeout(400);
 
 // ── 0. the panel ─────────────────────────────────────────────────────────────
@@ -168,8 +169,9 @@ const panel = await page.evaluate(() => {
     shown: !!(body && body.getClientRects().length), showing: dockShowing(),
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-relocate')?.closest('.dock-group')?.dataset.group,
-    afterSites: at('[data-dock="map-relocate"]') === at('[data-dock="map-sites"]') + 1,
-    beforeBest: at('[data-dock="map-bestrep"]') === at('[data-dock="map-relocate"]') + 1,
+    // Under 📻 Radio since the rail went by job: the second of 🗼 Find a
+    // better site's tabs (app.js, DOCK_FAMILIES).
+    job: dockJobOf('map-relocate'), fam: dockFamilyKeys('better'),
     runDisabled: document.getElementById('reloc-run')?.disabled,
     status: document.getElementById('reloc-status')?.textContent || '',
   };
@@ -177,8 +179,8 @@ const panel = await page.evaluate(() => {
 ok('a 🚚 Relocate station is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-relocate'
      && panel.title === 'Relocate station', JSON.stringify(panel));
-ok('…in the tools group, straight after the repeater site finder and straight before the best repeater finder',
-   panel.group === 'tools' && panel.afterSites && panel.beforeBest, JSON.stringify(panel));
+ok('…under Radio, Find a better site\'s second tab, straight after the repeater site finder and before Along a river',
+   panel.job === 'radio' && JSON.stringify(panel.fam) === JSON.stringify(['map-sites', 'map-relocate', 'map-riverscout']), JSON.stringify(panel));
 ok('Find new sites is off with no station, and the panel says what is missing',
    panel.runDisabled === true && /Pick the station/.test(panel.status), panel.status);
 

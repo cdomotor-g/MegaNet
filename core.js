@@ -777,30 +777,32 @@ const HELP = {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '
            + 'on the right. The rail on its edge names every button beside its icon — press '
            + '<strong>Collapse »</strong> at its top for icons alone, and « for the names again, the way '
-           + 'the left bar folds. Its first section, <strong>Stations &amp; places</strong>, holds '
-           + '<strong>Stations</strong> — the list with its filters, and the station details, one column '
-           + 'that scrolls on its own — <strong>Find a place</strong>, <strong>Radio link</strong> (the '
-           + '<strong>radio path</strong> you clicked or the two stations you picked, laid out like Radio '
-           + 'Mobile\'s Radio Link window — its figures, the <strong>elevation profile</strong>, the '
-           + 'transmitter and the receiver — with the <strong>link budget</strong> and its working under it, '
-           + 'in a pane of their own; 🗒️ <strong>Copy like RM</strong> and 📄 <strong>Copy for a report</strong> '
-           + 'stay at the top of it as it scrolls) and the '
-           + '<strong>Digital twin</strong>. (The 🔭 AR station finder is a tab of its own now, '
-           + '<strong>Look Around</strong>, in the left bar.) Press the button of the pane that is showing '
-           + 'and the side panel shuts, giving the map the width; drag its left edge (or focus it and use '
-           + 'the arrow keys) to make it wider or narrower. The map\'s own controls follow in two more '
-           + 'sections: <strong>Map</strong>, what the map shows (<strong>Layers</strong>, base maps first, '
-           + 'the <strong>Legend</strong> and <strong>Latency</strong>), and <strong>Tools</strong>, what '
-           + 'you point at it (<strong>Draw &amp; measure</strong>, <strong>Radio coverage</strong>, '
-           + '<strong>Move/New Repeater</strong>, <strong>Relocate station</strong>, <strong>Best '
-           + 'repeater</strong>, <strong>Repeater comparison</strong>, <strong>ACMA licences</strong> and <strong>What\'s here?</strong>). With the names showing, a section\'s heading folds it away and back. A panel '
-           + 'among them opens as a pane of the side panel, the way Stations does; a button does its one '
-           + 'thing, and a mode wears a switch that says whether it is on. The foot of the rail stays put '
-           + 'whatever is scrolled above it: <strong>Clear the selection</strong>, the <strong>3-D '
-           + 'view</strong> with its settings beside it (and its camera, once tilted), <strong>Full '
-           + 'screen</strong> and <strong>Help</strong>. The one control left on the map is <strong>↺ '
-           + 'Reset</strong>, alone in its top-right corner: it clears the filters, the selection, every '
-           + 'drawing and every card. <strong>Clear the selection</strong> (🧹 under Classic) is ↺ without '
+           + 'the left bar folds. The rail has four buttons. <strong>Stations</strong> is the list with its '
+           + 'filters, and the station details, one column that scrolls on its own. <strong>Places</strong> '
+           + 'finds a town, river, catchment, council area, survey mark or coordinate. <strong>Radio</strong> '
+           + 'and <strong>Site</strong> each open a list of their tools, every one with a line on what it '
+           + 'does and what it needs picked first. Radio has <strong>Best repeater</strong>, <strong>Radio '
+           + 'coverage</strong>, <strong>Radio link</strong> (the <strong>radio path</strong> you clicked or '
+           + 'the two stations you picked, laid out like Radio Mobile\'s Radio Link window — its figures, the '
+           + '<strong>elevation profile</strong>, the transmitter and the receiver — with the <strong>link '
+           + 'budget</strong> and its working under it; 🗒️ <strong>Copy like RM</strong> and 📄 <strong>Copy '
+           + 'for a report</strong> stay at the top of it as it scrolls), <strong>Find a better site</strong> '
+           + '(a repeater moved or built, a station moved, or a spot along a river, with a tab for each), '
+           + '<strong>Repeater comparison</strong> and <strong>ACMA licences</strong>. Site has <strong>Before '
+           + 'you dig</strong>, <strong>What\'s here?</strong>, <strong>Draw &amp; measure</strong> and the '
+           + '<strong>Digital twin</strong>. A tool\'s pane has <strong>← All radio tools</strong> (or site '
+           + 'tools) at its top, and the rail\'s button stays lit while one of its tools is open. (The 🔭 AR '
+           + 'station finder is a tab of its own now, <strong>Look Around</strong>, in the left bar.) Press '
+           + 'the button of the pane that is showing and the side panel shuts, giving the map the width; drag '
+           + 'its left edge (or focus it and use the arrow keys) to make it wider or narrower. What the map '
+           + 'shows is on the map itself, at its top right: <strong>Map look</strong> opens '
+           + '<strong>Layers</strong>, base maps first, with tabs for <strong>Imagery over time</strong>, the '
+           + '<strong>Legend</strong> and <strong>Latency &amp; signal</strong>. Under it are the '
+           + '<strong>Magnifier</strong>, the <strong>3-D view</strong> (its settings open beside the map, and '
+           + 'its camera appears once tilted) and <strong>↺ Reset</strong>, which clears the filters, the '
+           + 'selection, every drawing and every card. The foot of the rail stays put whatever is scrolled '
+           + 'above it: <strong>Clear the selection</strong>, <strong>Full screen</strong> and '
+           + '<strong>Help</strong>. <strong>Clear the selection</strong> (🧹 under Classic) is ↺ without '
            + 'the filters and without moving the map: it deselects the station and the stations you picked '
            + 'off the map, lets go of the radio path you clicked, puts the map\'s cards away, and takes off '
            + 'everything drawn on the map — drawings, the link budget\'s ends, the polar plot, the site '
@@ -957,14 +959,14 @@ const HELP = {
       + 'the way in, which is where the card appears, and <strong>🧊 Digital twin</strong> on a '
       + 'station\'s card opens its twin in one press, ticked or not. ⛰️ 3-D is the '
       + 'same idea at network scale, and offers it at the same zoom.',
-      '<strong>Digital twin, in the side panel\'s rail, is the twin\'s pane</strong> — what the Digital Twin tab '
+      '<strong>Digital twin, under Site in the side panel\'s rail, is the twin\'s pane</strong> — what the Digital Twin tab '
       + 'used to be: find a station and open its twin, the scene\'s settings (the patch, the '
       + 'exaggeration, the imagery, the cadastre, the horizon, the water, exploring together), the '
       + 'ground truth, the ground as numbers and the <code>.glb</code> for Blender. ⚙ Settings on the '
       + 'twin\'s own bar opens it. How the twin works is at the foot of the pane.',
-      '<strong>3-D view</strong> — its button in the Map section of the side panel\'s rail — opens its settings and '
+      '<strong>3-D view</strong> — its button on the map, under Map look — opens its settings and '
       + 'tilts the map. Pressed again while the map is in 3-D it only puts those settings away, or brings them back, '
-      + 'like every other button in the rail; the map stays in 3-D, and the button wears a gold ring to say so. '
+      + 'like a button in the side panel\'s rail; the map stays in 3-D, and the button wears a gold ring to say so. '
       + '<strong>Leave 3-D</strong>, edged in red at the top of the settings, is the way out. '
       + '3-D tilts the map onto the ground it is drawn on: the base map you are already on (the most opaque one, if you have blended several), draped over '
       + '~30 m terrain, with the pins and links you are already looking at on it. Drag to move, '
@@ -1148,7 +1150,7 @@ const HELP = {
       '<strong>Limit link length</strong> caps how long a signal link may be before it stops being '
       + 'drawn — it culls the <em>drawing</em>, never the data. A hop you expected to see and '
       + 'cannot may simply be past the <em>Max TX distance</em> slider, which opens at 100 km; '
-      + '<strong>Layers</strong> (in the side panel\'s rail) says how many links were drawn and how '
+      + '<strong>Layers</strong> (under Map look on the map) says how many links were drawn and how '
       + 'many were culled, so check that before concluding the path isn\'t there.',
       'The strip belongs to the box the caret is in and goes when focus leaves it — the results '
       + 'are kept, so clicking back into the box brings the same strip back without a second '
@@ -1184,7 +1186,7 @@ const HELP = {
       + 'this asks about the ground, which is the question siting actually starts from. Ground '
       + 'height there is a terrain tile above the EGM96 geoid, not a surveyed AHD figure like '
       + 'the one on a station\'s own card, and the card says so every time.',
-      'The <strong>Magnifier</strong>, under Tools in the rail, is for what the network is drawn on '
+      'The <strong>Magnifier</strong>, on the map under Map look, is for what the network is drawn on '
       + 'top of. Switch it on and a round glass follows the mouse, showing the map under it closer '
       + 'up — whichever base maps are ticked in Layers, the satellite and the State\'s own aerial '
       + 'photos among them — with each station\'s pin shrunk to a small dot, its name barely there, '
@@ -4877,10 +4879,9 @@ const state = {
   // two edges of the page start alike. A desktop's alone:
   // a phone's rail is always icons, a finger's width beside its map.
   dockNames:      dockNamesStored() ?? !(window.innerWidth < NAV_AUTO_COLLAPSE_PX || lookStored() === 'instrument'),
-  // …and which of its sections are folded away under their headings, by name
-  // ('places', 'show', 'tools'), under 'mn-dock-fold'. Only ever seen with the
-  // names on: icons alone have no headings to fold under.
-  dockFolded:     new Set((localStorage.getItem('mn-dock-fold') || '').split(',').filter(Boolean)),
+  // …and which of 🗺️ Map look's panes it opens on, the one it showed last
+  // (app.js, openMapLook). This visit's only: Layers on the next.
+  dockLook:       null,
   // Draw & measure overlay (Stations map). Plain geometry only — the Leaflet
   // layers are rebuilt from it whenever the map is, so a tab switch doesn't
   // throw the sketch away. Deliberately not persisted: see MapDraw.
