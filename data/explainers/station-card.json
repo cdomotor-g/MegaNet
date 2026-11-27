@@ -78,7 +78,7 @@
    "focus": "card",
    "say": "Under Data: its readings, every gauge on the same river, and the rain gauges round it, each a plot a press away.",
    "secs": 10,
-   "shot": "station-card",
+   "shot": "station-card-data",
    "callouts": [
     {
      "target": "data",

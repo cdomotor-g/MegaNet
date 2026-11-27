@@ -11592,6 +11592,8 @@ body .map-panel.is-driving {
    the 2-D pane then, and would show through the loading veil pointing at a
    pin the view is about to move. The overlays cover the pane anyway. */
 .mn-map-stage:has(#map3d.is-loading) .mn-leader,
+.mn-map-stage:has(#map3d.is-loading) .stn-label,
+.mn-map-stage:has(#map-twin.is-on) .stn-label,
 .mn-map-stage:has(#map-twin.is-on) .mn-leader {
   visibility: hidden;
 }
@@ -11621,6 +11623,110 @@ body .map-panel.is-driving {
 .stn-card.mn-leader-card > .stn-cv-top {
   box-shadow: inset 0 2px 0 var(--map-leader);
 }
+
+/* ── The station in the side panel (#299) ──────────────────────────────────
+   Beside the map on a desktop the station card is moved into the side panel's
+   Stations pane (app.js, syncStnDock), where it is the pane: no float, no
+   shadow, no width of its own and no handle (--mn-card-grip none), and not a
+   scroller — the pane scrolls, so the band at its top sticks to the pane's
+   top. The list folds away while it is there; Repeaters listening is in its
+   Radio tab; the form shows only after Edit, or while it holds something not
+   saved. */
+.stn-card.is-docked {
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  box-shadow: none;
+  z-index: auto;
+  --mn-card-grip: none;
+  margin: 0 0 var(--sp-2);
+}
+#stations-cards.has-station > #stations-list-card,
+#stations-cards.has-station > #stations-carriers-card,
+#stations-cards.has-station:not(.shows-form) > #stations-editor-card { display: none; }
+/* Editing: the form in the station's place, under its header. */
+.stn-card.is-docked.is-editing > :not(.stn-cv-top),
+.stn-card.is-docked.is-editing > .stn-cv-top > :not(.stn-dock-head) { display: none; }
+.stn-card.is-docked.is-editing > .stn-cv-top { border-bottom: 0; }
+
+/* The band at the top and the foot stick to the pane's own edges, over its
+   padding (.dock-pane-stations), so nothing scrolls past above or below them. */
+.stn-card.is-docked > .stn-cv-top { top: calc(-1 * var(--sp-2)); }
+.stn-card.is-docked > .stn-cv-dock { bottom: calc(-1 * var(--sp-4)); }
+
+.stn-dock-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: .3rem .5rem;
+}
+.stn-dock-back { justify-self: start; font-size: .82rem; }
+.stn-dock-edit { justify-self: end; }
+.stn-dock-edit[aria-pressed="true"] { border-color: var(--accent); background: var(--subtle); font-weight: 600; }
+.stn-dock-id { grid-column: 1 / -1; display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.stn-dock-id > strong { font-size: 1.05rem; line-height: 1.25; overflow-wrap: anywhere; }
+.stn-dock-kind { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; }
+.stn-dock-kind:empty, .stn-dock-heard:empty { display: none; }
+.stn-dock-type { color: var(--muted); }
+
+/* The tools most often run on a station, under the header. */
+.stn-dock-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  padding: 0 .6rem .45rem;
+}
+.stn-dock-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  min-height: 2rem;
+  padding: .25rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.stn-dock-tool:hover { border-color: var(--accent); color: var(--accent); }
+.stn-dock-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.stn-dock-toolic { font-size: .95rem; line-height: 1; }
+.stn-cv-slot > .panel { margin: .45rem .6rem; }
+
+/* The label by the pin while the station is in the side panel: its name and
+   when it was last heard. Placed by MapLeader beside the pin, at the card's
+   z-index (under callouts and the map's controls), and lifted over the 3-D
+   canvas with the cards. */
+.stn-label {
+  position: absolute;
+  left: var(--stn-label-x, 0);
+  top: var(--stn-label-y, 0);
+  z-index: 690;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 14rem;
+  padding: .25rem .55rem;
+  border: 1px solid var(--map-leader);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+  font: inherit;
+  font-size: .78rem;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+.stn-label[hidden], .stn-label.is-off { display: none; }
+.stn-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stn-label-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.stn-label-heard { color: var(--muted); font-size: .72rem; }
+.mn-map-stage:has(#map3d.is-on) .stn-label { z-index: 760; }
 
 /* The width handle on a map card's edge (card-width.js) — the edge that faces
    the map, which --mn-card-grip names beside each card's anchoring above. A

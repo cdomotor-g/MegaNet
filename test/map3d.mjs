@@ -1319,7 +1319,9 @@ if (pin) {
       box: r.width > 0 && r.height > 0,
       topLeft: mine(r.left + 14, r.top + 14),
       centre:  mine(r.left + r.width / 2, r.top + r.height / 2),
-      cardZ:   z(el),
+      // Beside the side panel the station is in the panel, and what is on the
+      // map is its label by the pin (#299): that is what must clear the canvas.
+      cardZ:   z(el.classList.contains('is-docked') ? document.getElementById('stn-label') : el),
       hereZ:   z(document.getElementById('here-card')),
       canvasZ: z(document.getElementById('map3d')),
       cornerZ: z(document.querySelector('.leaflet-top')),
@@ -1338,7 +1340,7 @@ if (pin) {
   // the canvas so it can be seen, under the control corners so the controls it
   // shares the map with stay reachable — Leaflet's zoom, and on any other map
   // the whole icon column.
-  ok('the card sits above the 3-D canvas and below the control corners',
+  ok('the card — or its label by the pin, beside the side panel — sits above the 3-D canvas and below the control corners',
      card.cardZ > card.canvasZ && card.cardZ < card.cornerZ,
      JSON.stringify({ card: card.cardZ, canvas: card.canvasZ, corner: card.cornerZ }));
   ok('and What is here’s card, which was under it too, is lifted with it',
@@ -1462,7 +1464,10 @@ const leader3d = id => page.evaluate((id) => {
   const p = m.project([ll.lng, ll.lat]);
   const svg = document.querySelector('.mn-leader');
   const cont = state.map.getContainer().getBoundingClientRect();
-  const c = document.getElementById('stn-card').getBoundingClientRect();
+  // The card, or its label by the pin while the card is in the side panel
+  // (#299): what the leader leaves from.
+  const card = document.getElementById('stn-card');
+  const c = document.getElementById(card.classList.contains('is-docked') ? 'stn-label' : 'stn-card').getBoundingClientRect();
   // The case is the widest of the three strokes: its inner edge is where the
   // ring stops being clear ground.
   const ring = document.querySelector('.mn-leader-case .mn-leader-ring');
@@ -1579,7 +1584,12 @@ if (pin) {
      JSON.stringify({ r: d.g && d.g.ring.r, ring2d: d.ring2d, clear: d.clear }));
 
   // Under the card: no leader, until reveal() — what a click on a pin there
-  // runs — slides the camera until the pin is out from under it.
+  // runs — slides the camera until the pin is out from under it. The card on
+  // the map, so the side panel shut: open, the station is in it and only its
+  // label is on the map, which is never over its pin (#299).
+  await page.evaluate(() => shutDock({ instant: true }));
+  await page.waitForTimeout(400);
+  await idle3d();
   await page.evaluate(t => {
     const m = Map3D._map(), cv = m.getCanvas();
     const cr = cv.getBoundingClientRect(), k = document.getElementById('stn-card').getBoundingClientRect();
@@ -1609,6 +1619,9 @@ if (pin) {
   ok('…keeping the zoom, the tilt and the heading',
      near(tilt.pitch, 60, 0.5) && near(tilt.bearing, 0, 0.5) && near(tilt.zoom, 12, 0.05),
      JSON.stringify(tilt));
+  await page.evaluate(() => setDockTab('stations', { instant: true }));
+  await page.waitForTimeout(400);
+  await idle3d();
 
   await page.evaluate(() => closeStnCard(false));
   await page.waitForTimeout(150);

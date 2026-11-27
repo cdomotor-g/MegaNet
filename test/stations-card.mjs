@@ -170,6 +170,9 @@ async function main() {
     const ed = await page.evaluate(() => {
       const s = state.data.stations.filter(x => x.lat != null && x.lon != null)[5];
       selectStation(s.id);
+      // Beside the map the station is in the side panel and its form behind
+      // Edit (#299): shown as Edit shows it, so it can be measured.
+      if (state.stnCard.id === s.id && stnCardDocked()) { state.stnCard.editing = true; repaintStnCard(); }
       const btn = document.querySelector('#stations-editor-card .mn-copy-latlon');
       const row = btn && btn.closest('.ef-movepin');
       return {
@@ -322,6 +325,8 @@ async function main() {
 
     // ── 5. The list and its filters, one card; the list collapses ─────────
     log('\nThe station list and its filters are one card, and the list shuts and says what it is hiding\n');
+    // No station in the side panel, where it folds the list away (#299).
+    await page.evaluate(() => closeStnCard(false));
 
     const card = await page.evaluate(() => {
       const c = document.getElementById('stations-list-card');
@@ -421,6 +426,8 @@ async function main() {
       null, { timeout: LOAD_TIMEOUT });
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
+    // The address brought the station back; put down, so the list is in sight.
+    await page.evaluate(() => closeStnCard(false));
     const afterReload = await page.evaluate(() => ({
       expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
       state: state.stationsListOpen,
@@ -443,16 +450,29 @@ async function main() {
       reopened.expanded === 'true' && reopened.stored === 'open' && reopened.table && reopened.rows > 0,
       `${reopened.rows} row(s), stored=${reopened.stored}`);
 
-    // A row picked shuts the list (pickStationFromList), and typing a new
-    // search opens it again to show what the search kept.
+    // Beside the map a row picked puts the station in the side panel and the
+    // list folds away under it — not shut — and ← All stations brings it back
+    // as it was (#299; pickStationFromList). Under the map a pick shuts it.
     await page.evaluate(() => { if (state.selectedId) selectStation(state.selectedId); });
     await page.click('#stations-table-wrap tr[data-sid] button');
     await page.waitForTimeout(150);
     const picked = await page.evaluate(() => ({
       expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
       selected: !!state.selectedId,
+      folded: !document.getElementById('stations-list-card').getClientRects().length,
+      docked: document.getElementById('stn-card').classList.contains('is-docked'),
     }));
-    check('picking a row shuts the list', picked.expanded === 'false' && picked.selected, JSON.stringify(picked));
+    check('picking a row folds the list away under the station, not shut', picked.expanded === 'true'
+      && picked.selected && picked.folded && picked.docked, JSON.stringify(picked));
+    await page.click('#stn-card .stn-dock-back');
+    await page.waitForTimeout(150);
+    const backList = await page.evaluate(() => ({
+      expanded: document.getElementById('stations-list-toggle').getAttribute('aria-expanded'),
+      table: document.getElementById('stations-table-wrap').checkVisibility(),
+    }));
+    check('← All stations brings it back as it was, open', backList.expanded === 'true' && backList.table, JSON.stringify(backList));
+    await page.click('#stations-list-toggle');
+    await page.waitForTimeout(150);
     await page.locator('#filter-quick textarea').first().fill('a');
     await page.waitForTimeout(400);
     const typed = await page.evaluate(() => ({

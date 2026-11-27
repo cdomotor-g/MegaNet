@@ -266,40 +266,52 @@
    "width": 1440,
    "height": 810,
    "scale": 1.3333333333333333,
-   "bytes": 152028,
-   "taken": "2026-11-10T09:28:40Z",
+   "bytes": 148300,
+   "taken": "2026-11-27T12:49:30Z",
    "site": "127.0.0.1:8080",
-   "stamp": "20261110a",
+   "stamp": "20261127b",
    "targets": {
     "card": {
-     "x": 275,
-     "y": 216,
-     "w": 340,
-     "h": 444
+     "x": 763,
+     "y": 107,
+     "w": 454,
+     "h": 703
     },
     "title": {
-     "x": 286,
-     "y": 226,
-     "w": 115,
-     "h": 17
+     "x": 774,
+     "y": 146,
+     "w": 433,
+     "h": 21
     },
     "owner": {
-     "x": 286,
-     "y": 344,
-     "w": 319,
-     "h": 52
+     "x": 774,
+     "y": 367,
+     "w": 433,
+     "h": 35
     },
     "health": {
-     "x": 276,
-     "y": 481,
-     "w": 338,
-     "h": 202
+     "x": 764,
+     "y": 470,
+     "w": 452,
+     "h": 324
     },
     "data": {
-     "x": 276,
-     "y": 683,
-     "w": 338,
-     "h": 127
+     "x": 764,
+     "y": 793,
+     "w": 452,
+     "h": 17
+    },
+    "tools": {
+     "x": 764,
+     "y": 212,
+     "w": 452,
+     "h": 76
+    },
+    "label": {
+     "x": 518,
+     "y": 391,
+     "w": 120,
+     "h": 40
     }
    },
    "selectors": {
@@ -307,8 +319,56 @@
     "title": "#stn-card-title",
     "owner": "[data-tour='card-owner']",
     "health": "[data-tour='card-health']",
-    "data": "[data-tour='card-data']"
+    "data": "[data-tour='card-data']",
+    "tools": "[data-tour='station-tools']",
+    "label": "[data-tour='station-label']"
    }
+  },
+  "station-card-data": {
+   "name": "station-card-data",
+   "image": "data/explainers/shots/station-card-data.webp",
+   "device": "desk",
+   "path": "?tab=stations&station=brisbane_city_al",
+   "width": 1440,
+   "height": 810,
+   "scale": 1.3333333333333333,
+   "bytes": 170372,
+   "taken": "2026-11-27T12:49:43Z",
+   "site": "127.0.0.1:8080",
+   "stamp": "20261127b",
+   "targets": {
+    "card": {
+     "x": 763,
+     "y": 0,
+     "w": 454,
+     "h": 810
+    },
+    "title": {
+     "x": 774,
+     "y": 137,
+     "w": 433,
+     "h": 21
+    },
+    "data": {
+     "x": 764,
+     "y": 423,
+     "w": 452,
+     "h": 334
+    }
+   },
+   "selectors": {
+    "card": "[data-tour='station-card']",
+    "title": "#stn-card-title",
+    "data": "[data-tour='card-data']"
+   },
+   "steps": [
+    {
+     "scroll": "[data-tour='card-health']"
+    },
+    {
+     "wait": 800
+    }
+   ]
   },
   "station-card-lower": {
    "name": "station-card-lower",
@@ -318,27 +378,27 @@
    "width": 1440,
    "height": 810,
    "scale": 1.3333333333333333,
-   "bytes": 149292,
-   "taken": "2026-11-27T07:50:14Z",
-   "site": "127.0.0.1:33651",
-   "stamp": "20261127a",
+   "bytes": 142042,
+   "taken": "2026-11-27T12:48:25Z",
+   "site": "127.0.0.1:8080",
+   "stamp": "20261127b",
    "targets": {
     "card": {
-     "x": 275,
-     "y": 216,
-     "w": 340,
-     "h": 450
+     "x": 763,
+     "y": 16,
+     "w": 454,
+     "h": 719
     },
     "position": {
-     "x": 276,
-     "y": 338,
-     "w": 338,
+     "x": 764,
+     "y": 412,
+     "w": 452,
      "h": 88
     },
     "imagery": {
-     "x": 276,
-     "y": 426,
-     "w": 338,
+     "x": 764,
+     "y": 500,
+     "w": 452,
      "h": 88
     }
    },

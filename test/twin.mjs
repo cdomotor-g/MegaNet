@@ -1689,13 +1689,15 @@ try {
              paths: d.paths, size: d.size, zoom: state.map.getZoom(),
              dragging: state.map.dragging.enabled(), wheel: state.map.scrollWheelZoom.enabled(),
              back: !!document.querySelector('#map-twin .map-twin-back'), status: d.status,
-             cardAbove: (() => { const c = document.getElementById('stn-card'); return c ? getComputedStyle(c).zIndex : null; })() };
+             cardAbove: (() => { const c = document.getElementById('stn-card'); return c ? getComputedStyle(c).zIndex : null; })(),
+             // Beside the side panel the station is in the panel, not over the twin (#299).
+             cardDocked: !!document.querySelector('#stn-card.is-docked') };
   });
   ok('pressed, the map hands over to its twin',
     inMap.active && inMap.station === linked.id && inMap.embedded && inMap.built && inMap.live && inMap.hostOn && inMap.inMap && inMap.back,
     JSON.stringify({ ...inMap, paths: undefined }));
   ok('and Leaflet\'s own drag and wheel are held off under it', !inMap.dragging && !inMap.wheel);
-  ok('the station card stays above the twin', inMap.cardAbove === '760', String(inMap.cardAbove));
+  ok('the station card stays above the twin — or is in the side panel beside it', inMap.cardAbove === '760' || inMap.cardDocked, String(inMap.cardAbove));
   const half = inMap.size / 2;
   const P = inMap.paths || { list: [], count: 0 };
   ok('the radio paths are the map\'s own lines: one ray per far end, in the colour the map gave it',

@@ -105,7 +105,9 @@ const leaderFit = `(() => {
   const id = state.stnCard.id;
   const m = state.mapMarkers.find(x => x.mnStationId === id);
   const p = state.map.latLngToContainerPoint(m ? m.getLatLng() : L.latLng(0, 0));
-  const c = document.getElementById('stn-card').getBoundingClientRect();
+  // In the side panel the leader is the label's, by the pin (#299).
+  const docked = document.getElementById('stn-card').classList.contains('is-docked');
+  const c = document.getElementById(docked ? 'stn-label' : 'stn-card').getBoundingClientRect();
   const k = state.map.getContainer().getBoundingClientRect();
   const box = { left: c.left - k.left, top: c.top - k.top, right: c.right - k.left, bottom: c.bottom - k.top };
   const onTop = !!g.from && g.from.y >= box.top - 1 && g.from.y <= box.top + 9
@@ -116,6 +118,7 @@ const leaderFit = `(() => {
     atPin: Math.hypot(g.ring.x - p.x, g.ring.y - p.y) < 1.5,
     endsOnRing: toRing != null && Math.abs(toRing - g.ring.r) < 1.5,
     crown: document.getElementById('stn-card').classList.contains('mn-leader-card'),
+    docked,
   };
 })()`;
 
@@ -128,6 +131,11 @@ async function main() {
     // ── A. Desktop ──────────────────────────────────────────────────────
     const { page } = await openStations(browser, server, errors,
       { viewport: { width: 1440, height: 900 } });
+    // The card on the map, at a desktop's width: with the side panel open the
+    // station is in the panel instead (#299, section D below), so the map
+    // card's own checks run with the panel shut — where it is the card.
+    await page.evaluate(() => shutDock({ instant: true }));
+    await page.waitForTimeout(250);
 
     log('\nA pin click paints the card, and loads the station into the details\n');
 
@@ -180,13 +188,16 @@ async function main() {
     const pane = await page.evaluate(() => {
       const card = document.getElementById('stations-editor-card');
       const p = card && card.closest('#help-panel .dock-pane');
-      if (!p) return { inPane: false, showing: dockShowing() };
+      const cardOnMap = !document.getElementById('stn-card').closest('#help-panel');
+      if (!p) return { inPane: false, showing: dockShowing(), cardOnMap };
       const r = card.getBoundingClientRect(), q = p.getBoundingClientRect();
       return { inPane: true, showing: dockShowing(), dock: p.dataset.dock,
-               top: Math.round(r.top - q.top), height: Math.round(q.height), scrolled: p.scrollTop };
+               top: Math.round(r.top - q.top), height: Math.round(q.height), scrolled: p.scrollTop, cardOnMap };
     });
-    check('beside the map, the side panel scrolls to the station details',
-      pane.inPane && pane.showing === pane.dock && pane.top >= -4 && pane.top < 60,
+    // The side panel was shut, and a pin click is not a reason to open it: the
+    // card on the map is where the station is then (#299).
+    check('with the side panel shut, a pin click leaves it shut — the card is on the map',
+      pane.inPane && pane.showing === null && pane.cardOnMap,
       JSON.stringify(pane));
     check('no callout opens on a desktop — the card says it all', !clicked.popupToo);
 
@@ -280,6 +291,11 @@ async function main() {
     // scaled by a CSS transition meanwhile. The leader walks its end along
     // with them rather than vanishing, and lands on the pin.
     const zoomed = await page.evaluate(async () => {
+      // Right of the map's middle, clear of the card, so a zoom about the
+      // middle carries the pin further right rather than under the card.
+      const m = state.mapMarkers.find(x => x.mnStationId === state.stnCard.id);
+      const size = state.map.getSize(), p = state.map.latLngToContainerPoint(m.getLatLng());
+      state.map.panBy([p.x - (size.x / 2 + 60), p.y - size.y / 2], { animate: false });
       const seen = [];
       let raf = true;
       const tick = () => { seen.push(MapLeader.geometry()); if (raf) requestAnimationFrame(tick); };
@@ -506,7 +522,14 @@ async function main() {
     check('Edit selects the station', edited.selected);
     check('and brings the editor card into the viewport', edited.inView, `top=${edited.top}`);
     check('with focus on its first control', edited.focusIn);
-    check('while the map card stays, repainted for the selection', edited.cardThere);
+    check('while the card stays, repainted for the selection', edited.cardThere);
+    // Edit opened the side panel for the form (it was shut), and with the
+    // panel open the station is in it: from here on, the card is there (#299).
+    check('Edit opens the side panel, and the station goes into it, the form under its header',
+      await page.evaluate(() => dockShowing() === 'stations'
+        && document.getElementById('stn-card').classList.contains('is-docked')
+        && !!document.getElementById('stn-card').closest('#help-panel')
+        && state.stnCard.editing === true));
 
     const jump = await page.evaluate(() => ({
       offered: !!document.querySelector('#stn-card button[onclick^="stnCardScrollToCarriers"]'),
@@ -517,13 +540,17 @@ async function main() {
 
     // Out of full screen on the way to the editor: there is no "below" inside
     // a fixed panel.
+    // In full screen the side panel is beside the map, and the form opens in
+    // it: nothing to leave.
     const fromFull = await page.evaluate(() => {
       toggleMapFullscreen(true);
       const was = state.mapFullscreen;
       editStationFromCard(state.stnCard.id);
       return { was, now: state.mapFullscreen };
     });
-    check('from full screen, Edit leaves full screen first', fromFull.was === true && fromFull.now === false);
+    check('from full screen, Edit keeps the map full — the form is in the side panel beside it',
+      fromFull.was === true && fromFull.now === true);
+    await page.evaluate(() => toggleMapFullscreen(false));
     await page.waitForTimeout(400);
 
     log('\nThe details follow the card — but not over edits nobody has saved\n');
@@ -547,9 +574,11 @@ async function main() {
     check('…and leaves the details on the edit, typing and all',
       held.editor === firstId && held.selected === firstId && held.typed === `${firstName} (renamed)`,
       JSON.stringify(held));
-    check('…and the card says why, and what Station details would do about it',
-      /Not loaded in the station details .* holding unsaved changes to .*Station details .* drops it/.test(held.note),
+    check('…and the card says why, and what Edit would do about it',
+      /station details .* holding unsaved changes to .* Edit loads this station there and drops it/.test(held.note),
       held.note);
+    check('…the form holding the edit is still shown, under the station',
+      await page.evaluate(() => document.getElementById('stations-editor-card').getClientRects().length > 0));
     // Typed back to what it was, nothing is unsaved: the next click on the
     // card's station loads it.
     await page.fill('#ef-name', firstName);
@@ -574,12 +603,12 @@ async function main() {
     });
     check('a station shown by a link leaves the details where they were, and says so',
       linked.card === linked.other && linked.editor === linked.was
-        && /Not loaded in the station details .* Station details .* loads it\./.test(linked.note),
+        && /Edit, at the top, loads it into the station details\./.test(linked.note),
       JSON.stringify(linked));
 
     log('\nClosing is a decision; opening is a gesture\n');
 
-    await page.click('#stn-card .acma-card-head button');
+    await page.click('#stn-card .acma-card-head .stn-dock-back');
     const closed = await page.evaluate(() => {
       const leaderGone = MapLeader.geometry() === null
         && getComputedStyle(document.querySelector('.mn-leader')).display === 'none';
@@ -592,7 +621,7 @@ async function main() {
         stillNoLeader: MapLeader.geometry() === null,
       };
     });
-    check('× closes the card and forgets the station', closed.hidden && closed.idNull);
+    check('← All stations closes the card and forgets the station', closed.hidden && closed.idNull);
     check('and takes the leader with it', closed.leaderGone);
     check('and nothing passive brings either back', closed.stillHidden && closed.stillNoLeader);
 
@@ -724,8 +753,11 @@ async function main() {
     check('and points at its pin with the leader — no callout, at any width',
       !fromRow.popup && !!rowLead && rowLead.atPin && rowLead.onTop,
       rowLead ? `popup=${fromRow.popup} ${JSON.stringify({ ring: rowLead.ring, pin: rowLead.pin })}` : `popup=${fromRow.popup}, no leader`);
-    check('with the pin put clear of the card, where the leader can reach it',
-      !!rowLead && rowLead.pin.x > rowLead.box.right, rowLead ? JSON.stringify({ pin: rowLead.pin, box: rowLead.box }) : '');
+    // With the side panel open the station is in it, and the map has its label
+    // beside the pin, not the card over the map (#299).
+    check('with the side panel open, the card is in it and the map has the label, beside the pin',
+      !!rowLead && rowLead.docked && rowLead.pin.x < rowLead.box.left && rowLead.pin.y > rowLead.box.top
+        && rowLead.pin.y < rowLead.box.bottom, rowLead ? JSON.stringify({ pin: rowLead.pin, box: rowLead.box }) : '');
 
     // Not hard against the card's edge: in the middle of the map the card
     // leaves open — the strip right of it, halfway down (MapLeader.centreFor).
@@ -733,36 +765,31 @@ async function main() {
     const mapNow = () => page.evaluate(() => {
       const s = state.data.stations.find(x => x.id === state.stnCard.id);
       const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
-      const c = document.getElementById('stn-card').getBoundingClientRect();
+      const card = document.getElementById('stn-card');
+      const c = card.getBoundingClientRect();
       const k = state.map.getContainer().getBoundingClientRect();
       const size = state.map.getSize();
       const m = state.map.getCenter();
+      // The card in the side panel leaves the whole map open: its middle.
+      const left = card.classList.contains('is-docked') ? 0 : c.right - k.left;
       return {
         pin: { x: Math.round(p.x), y: Math.round(p.y) },
-        want: { x: Math.round((c.right - k.left + size.x) / 2), y: Math.round(size.y / 2) },
+        want: { x: Math.round((left + size.x) / 2), y: Math.round(size.y / 2) },
         centre: { lat: m.lat, lng: m.lng, z: state.map.getZoom() }, w: Math.round(c.width),
       };
     });
     const mid = await mapNow();
-    check('in the middle of the map right of the card, not just clear of its edge',
+    check('in the middle of the map the card leaves open — all of it, with the card in the side panel',
       Math.abs(mid.pin.x - mid.want.x) <= 2 && Math.abs(mid.pin.y - mid.want.y) <= 2,
       JSON.stringify({ pin: mid.pin, want: mid.want }));
 
-    // Widening the card by its edge (card-width.js) leaves the map where it
-    // is — only the next pick is centred in what the card leaves — and so
-    // does putting it back.
-    await page.focus('#stn-card + .mn-cardw');
-    await page.keyboard.press('PageUp');
-    await page.waitForTimeout(350);
-    const wider = await mapNow();
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(350);
-    const back = await mapNow();
-    const still = v => v.centre.z === mid.centre.z
-      && Math.abs(v.centre.lat - mid.centre.lat) < 1e-9 && Math.abs(v.centre.lng - mid.centre.lng) < 1e-9;
-    check('widening the card by its edge leaves the map where it was, and so does putting it back',
-      wider.w > mid.w + 50 && back.w === mid.w && still(wider) && still(back),
-      JSON.stringify({ w: [mid.w, wider.w, back.w], centre: [mid.centre, wider.centre, back.centre] }));
+    // In the side panel the card has no width of its own — the panel's edge
+    // is its width — so no handle (card-width.js tests the map card's).
+    const grip = await page.evaluate(() => {
+      const g = document.querySelector('#stn-card + .mn-cardw');
+      return { none: !g || g.hidden || !g.getClientRects().length };
+    });
+    check('in the side panel the card has no width handle of its own', grip.none, JSON.stringify(grip));
 
     // From the keyboard: Enter on a row's button. The table repaints under
     // the keyboard and used to drop focus to <body>; it finds the row again,
@@ -780,21 +807,22 @@ async function main() {
     await rowBtn.focus();
     await page.keyboard.press('Enter');
     const keyed = await page.evaluate(sid => {
-      // The pick shuts the list (pickStationFromList), so focus goes to the
-      // list's toggle rather than a row it hides.
-      const toggle = document.getElementById('stations-list-toggle');
-      const out = { kept: document.activeElement === toggle, selected: state.selectedId === sid,
-        shut: document.getElementById('stations-list-body').hidden,
-        card: !document.getElementById('stn-card').hidden };
-      document.getElementById('stn-card').dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      out.backOnRow = document.activeElement === toggle;
-      setStationsListOpen(true);
+      // Beside the map the pick puts the station in the side panel and the
+      // list folds away under it (#299) — not shut, only out of sight — so
+      // focus goes to the station rather than a row it hides.
+      const card = document.getElementById('stn-card');
+      const list = document.getElementById('stations-list-card');
+      const out = { kept: document.activeElement === card, selected: state.selectedId === sid,
+        folded: !list.getClientRects().length, open: !document.getElementById('stations-list-body').hidden,
+        card: !card.hidden && card.classList.contains('is-docked') };
+      card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      const a = document.activeElement, row = a && a.closest('#stations-table-wrap tr[data-sid]');
+      out.backOnRow = !!row && row.dataset.sid === sid && list.getClientRects().length > 0;
       return out;
     }, rowSid);
-    check('Enter on a row selects it, shuts the list and keeps focus on the list\'s toggle',
-      keyed.kept && keyed.selected && keyed.shut && keyed.card, JSON.stringify(keyed));
-    check('and Escape on the card returns to that toggle', keyed.backOnRow);
+    check('Enter on a row selects it, the list folds away under the station, focus on the station',
+      keyed.kept && keyed.selected && keyed.folded && keyed.open && keyed.card, JSON.stringify(keyed));
+    check('and Escape on it brings the list back, focus on that station\'s row', keyed.backOnRow, JSON.stringify(keyed));
 
     log('\nThe modes that share the card\'s pills\n');
 
@@ -925,7 +953,10 @@ async function main() {
       const card = document.getElementById('stn-card').getBoundingClientRect();
       const k = state.map.getContainer().getBoundingClientRect();
       const p = state.map.latLngToContainerPoint([a.lat, a.lon]);
-      state.map.panBy([p.x - (card.right - k.left + 220), 0], { animate: false });
+      // Right of the card on the map; with the card in the side panel, right
+      // of the map's left edge.
+      const left = stnCardDocked() ? 0 : card.right - k.left;
+      state.map.panBy([p.x - (left + 220), 0], { animate: false });
       const fire = () => m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
       const fans = MapSpider.willFan(m);
       fire();
@@ -1183,10 +1214,137 @@ async function main() {
       legend.heads.join(' | '));
     await fresh.context.close();
 
+    // ── D. The station in the side panel (#299) ──────────────────────────
+    log('\nBeside the map, the side panel becomes the station\n');
+    const dk = await openStations(browser, server, errors, { viewport: { width: 1440, height: 900 } });
+    const dp = dk.page;
+    const dId = await dp.evaluate(`(() => {
+      const m = ${lonePin(0)};
+      m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
+      return m.mnStationId;
+    })()`);
+    await dp.waitForTimeout(500);
+    const d0 = await dp.evaluate(id => {
+      const card = document.getElementById('stn-card');
+      const cards = document.getElementById('stations-cards');
+      const vis = el => !!el && el.getClientRects().length > 0;
+      const s = state.data.stations.find(x => x.id === id);
+      const label = document.getElementById('stn-label');
+      return {
+        docked: card.classList.contains('is-docked'), first: cards.firstElementChild === card,
+        inPane: !!card.closest('#help-panel .dock-pane'), showing: dockShowing(),
+        listFolded: !vis(document.getElementById('stations-list-card')),
+        formHidden: !vis(document.getElementById('stations-editor-card')),
+        back: (card.querySelector('.stn-dock-back') || {}).textContent,
+        name: (document.getElementById('stn-card-title') || {}).textContent, want: s.name,
+        kind: !!card.querySelector('.stn-dock-kind .mn-pop-pill'),
+        heard: !!document.getElementById('stn-dock-heard'),
+        edit: (card.querySelector('.stn-dock-edit') || {}).textContent,
+        tools: [...card.querySelectorAll('.stn-dock-tool')].map(b => b.dataset.tool),
+        tabs: [...card.querySelectorAll('.stn-cv-tab')].map(t => t.textContent.trim()),
+        views: !!card.querySelector('.stn-cv-views'),
+        carried: findRepeaterMatches(s).length,
+        carriersIn: !!card.querySelector('#stn-grp-radio #stations-carriers-card'),
+        label: { shown: vis(label), text: label.textContent, box: label.getBoundingClientRect().toJSON() },
+        leader: MapLeader.geometry(), crown: card.classList.contains('mn-leader-card'),
+      };
+    }, dId);
+    check('a pin click puts the station in the side panel, at the head of its Stations pane',
+      d0.docked && d0.first && d0.inPane && d0.showing === 'stations', JSON.stringify(d0));
+    check('…the station list folded away under it, and the form not shown', d0.listFolded && d0.formHidden);
+    check('its header: ← All stations, the name, its kind, last heard and Edit',
+      /All stations/.test(d0.back) && d0.name === d0.want && d0.kind && d0.heard && /Edit/.test(d0.edit),
+      JSON.stringify({ back: d0.back, name: d0.name, edit: d0.edit }));
+    check('the tool bar: Best repeater, Radio coverage, Before you dig and More',
+      ['map-bestrep', 'map-polar', 'map-dig'].every(t => d0.tools.includes(t)) && d0.tools[d0.tools.length - 1] === 'radio',
+      d0.tools.join(','));
+    check('tabs Overview · Radio · Flood · Site · Visits, and no Tabs | List switch',
+      d0.tabs.join(',') === 'Overview,Radio,Flood,Site,Visits' && !d0.views, d0.tabs.join(','));
+    check('Repeaters listening is in its Radio tab', d0.carried === 0 || d0.carriersIn, `${d0.carried} carrier(s)`);
+    check('the map shows a small label by the pin — its name — and not the card',
+      d0.label.shown && d0.label.text.includes(d0.want) && d0.label.box.width < 260, JSON.stringify(d0.label));
+    check('…and the leader rings the pin from the label', !!d0.leader && d0.leader.id === dId && !d0.crown,
+      JSON.stringify(d0.leader));
+
+    // Edit: the form in the station's place, the header still there; ✓ Done
+    // puts it away.
+    await dp.click('#stn-card .stn-dock-edit');
+    await dp.waitForTimeout(700);
+    const d1 = await dp.evaluate(() => {
+      const vis = el => !!el && el.getClientRects().length > 0;
+      const card = document.getElementById('stn-card');
+      return { form: vis(document.getElementById('stations-editor-card')), head: vis(card.querySelector('.stn-dock-head')),
+        tabs: vis(card.querySelector('.stn-cv-tabs')), pressed: card.querySelector('.stn-dock-edit').getAttribute('aria-pressed'),
+        focusIn: document.getElementById('stations-editor-card').contains(document.activeElement) };
+    });
+    check('Edit shows the form under the station\'s header, its tabs put away, focus in the form',
+      d1.form && d1.head && !d1.tabs && d1.pressed === 'true' && d1.focusIn, JSON.stringify(d1));
+    await dp.click('#stn-card .stn-dock-edit');
+    await dp.waitForTimeout(200);
+    const d2 = await dp.evaluate(() => ({
+      form: document.getElementById('stations-editor-card').getClientRects().length > 0,
+      tabs: document.querySelector('#stn-card .stn-cv-tabs').getClientRects().length > 0,
+      focus: document.activeElement === document.querySelector('#stn-card .stn-dock-edit'),
+    }));
+    check('✓ Done puts the form away and the tabs back, focus kept on it', !d2.form && d2.tabs && d2.focus, JSON.stringify(d2));
+
+    // A tool from the bar: its pane, with the station picked; the station
+    // waits in its own pane, the label on the map says where.
+    await dp.click('#stn-card .stn-dock-tool[data-tool="map-polar"]');
+    await dp.waitForTimeout(300);
+    const d3 = await dp.evaluate(id => ({ showing: dockShowing(),
+      label: document.getElementById('stn-label').getClientRects().length > 0, card: state.stnCard.id === id }), dId);
+    check('Radio coverage opens its pane, the station kept and its label still on the map',
+      d3.showing === 'map-polar' && d3.label && d3.card, JSON.stringify(d3));
+    await dp.click('#stn-label');
+    await dp.waitForTimeout(300);
+    const d4 = await dp.evaluate(() => ({ showing: dockShowing(),
+      focus: document.getElementById('stn-card').contains(document.activeElement) }));
+    check('a press on the label brings the side panel back to the station, focus in it',
+      d4.showing === 'stations' && d4.focus, JSON.stringify(d4));
+    await dp.click('#stn-card .stn-dock-tool[data-tool="radio"]');
+    await dp.waitForTimeout(200);
+    check('More ▸ opens the 📻 Radio list of tools', await dp.evaluate(() => dockShowing() === 'radio'));
+    await dp.evaluate(() => setDockTab('stations'));
+
+    // The side panel shut: the card is on the map, as it was; opened again,
+    // it goes back in.
+    const d5 = await dp.evaluate(async () => {
+      shutDock({ instant: true });
+      await new Promise(r => setTimeout(r, 200));
+      const card = document.getElementById('stn-card');
+      const shut = { onMap: !card.closest('#help-panel') && !card.classList.contains('is-docked') && !card.hidden,
+        label: document.getElementById('stn-label').hidden, close: !!card.querySelector('button[aria-label="Close the station card"]') };
+      setDockTab('stations', { instant: true });
+      await new Promise(r => setTimeout(r, 200));
+      return { shut, back: card.classList.contains('is-docked') && !!card.closest('#help-panel') };
+    });
+    check('with the side panel shut the card is on the map, as it was — × and all, no label',
+      d5.shut.onMap && d5.shut.label && d5.shut.close, JSON.stringify(d5));
+    check('…and opened again, the station goes back into it', d5.back);
+
+    // ← All stations: the station put down, the list back, focus on its row.
+    await dp.click('#stn-card .stn-dock-back');
+    await dp.waitForTimeout(300);
+    const d6 = await dp.evaluate(id => {
+      const a = document.activeElement, row = a && a.closest('#stations-table-wrap tr[data-sid]');
+      return { closed: document.getElementById('stn-card').hidden && state.stnCard.id === null,
+        deselected: state.selectedId === null,
+        list: document.getElementById('stations-list-card').getClientRects().length > 0,
+        label: document.getElementById('stn-label').hidden,
+        row: row && row.dataset.sid, want: id, tag: a && a.tagName };
+    }, dId);
+    check('← All stations puts the station down: the card gone, the selection cleared, the list back',
+      d6.closed && d6.deselected && d6.list && d6.label, JSON.stringify(d6));
+    check('…focus on that station\'s row in the list', d6.row === d6.want, JSON.stringify(d6));
+    await dk.context.close();
+
     // ── The card's two layouts and its search (station-card-view.js) ──────
     log('\nThe card in groups: Tabs first, List remembered, and a search across it\n');
     const cv = await openStations(browser, server, errors, { viewport: { width: 1440, height: 900 } });
     const vp = cv.page;
+    // The map card's two layouts: the side panel shut, as in A.
+    await vp.evaluate(() => shutDock({ instant: true }));
     const cvId = await vp.evaluate(`(() => { const m = ${lonePin(0)}; showStationCard(m.mnStationId); return m.mnStationId; })()`);
     await vp.waitForSelector('#stn-card:not([hidden]) .stn-cv-top', { timeout: 10_000 });
     const shown = () => vp.evaluate(() => [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp')]

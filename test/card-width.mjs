@@ -67,6 +67,10 @@ async function load(page, server) {
   await page.waitForFunction(() => !state.map._animatingZoom
     && !(state.map._panAnim && state.map._panAnim._inProgress), null, { timeout: 10_000 });
   await page.waitForTimeout(150);
+  // The card on the map is the one with a width of its own: with the side
+  // panel open the station is in the panel instead (#299), so it is shut.
+  await page.evaluate(() => shutDock({ instant: true }));
+  await page.waitForTimeout(150);
 }
 
 // The n-th located station's card, opened without moving the map.

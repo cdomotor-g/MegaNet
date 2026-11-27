@@ -84,6 +84,8 @@ async function openStations(browser, server, errors, contextOpts) {
   return { context, page };
 }
 
+// Beside the map a station's form is behind its Edit (#299): the selections
+// below press it.
 async function main() {
   const sql = fs.readFileSync(MIGRATION, 'utf8') + '\n' + fs.readFileSync(MIGRATION_32, 'utf8');
   const sql33 = fs.readFileSync(MIGRATION_0033, 'utf8');
@@ -160,7 +162,7 @@ async function main() {
 
     // Every box the form reads has a column to land in — by reading the form's
     // own markup, which is what the save is built from.
-    await page.evaluate(id => selectStation(id), full.id);
+    await page.evaluate(id => { selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, full.id);
     await page.waitForSelector('#ef-rhs-flood_classes');
     const formKeys = await page.evaluate(lists => Object.fromEntries(lists.map(k =>
       [k, [...new Set([...document.querySelectorAll(`#ef-rhs-${k} [data-f]`)].map(e => e.dataset.f))]])), LISTS);
@@ -311,6 +313,7 @@ async function main() {
     // already the selection — the check above left it selected.
     await page.evaluate(id => {
       if (state.selectedId !== id) selectStation(id);
+      if (!state.stnCard.editing) editStationFromCard(id);
       dockReveal(document.getElementById('stations-editor-card'));
     }, full.id);
     await page.waitForSelector('#ef-rhs-flood_classes .rhs-row');
@@ -438,7 +441,7 @@ async function main() {
 
     // The Bureau's backwards period is shown, not hidden.
     if (backwards) {
-      await page.evaluate(id => { if (state.selectedId !== id) selectStation(id); }, backwards.id);
+      await page.evaluate(id => { if (state.selectedId !== id) selectStation(id); if (!state.stnCard.editing) editStationFromCard(id); }, backwards.id);
       await page.waitForSelector('#ef-rhs-gauge_survey .rhs-row', { state: 'attached' });
       check('a period printed backwards is said so on its row',
         await page.evaluate(() => [...document.querySelectorAll('#ef-rhs-gauge_survey .rhs-flag')]

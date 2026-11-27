@@ -113,7 +113,10 @@ const geometry = `(() => {
     stage: r(stage),
     zoom: r(document.querySelector('.mn-map-stage .leaflet-top.leaflet-left .leaflet-control')),
     reset: r(document.querySelector('.mn-map-stage .leaflet-top.leaflet-right .leaflet-control')),
-    card: card && !card.hidden ? r(card) : null,
+    // The card on the map; beside the side panel the station is in the
+    // panel, and nothing on the map stands where the card did (#299).
+    card: card && !card.hidden && !card.classList.contains('is-docked') ? r(card) : null,
+    open: !!card && !card.hidden,
     twinStage: r(document.querySelector('#map-twin.is-on #twin-stage')),
     scale: r(document.querySelector('#map-twin.is-on #twin-flood-scale')),
     scaleHead: r(document.querySelector('#map-twin.is-on .twin-scale-head')),
@@ -180,11 +183,11 @@ async function main() {
     await page.evaluate(id => showStationCard(id), c);
     await page.click('#stn-card .acma-card-head button');
     G = await g();
-    check('the card closed: the pill stays, and says it brings the card back', !G.hidden && G.card === null
+    check('the card closed: the pill stays, and says it brings the card back', !G.hidden && !G.open
       && G.title.startsWith(`${cName}'s card again`), G.title);
     await page.click('#stn-trail-pill');
     G = await g();
-    check('pressed, the pill brings the card back on its station…', G.card !== null
+    check('pressed, the pill brings the card back on its station…', G.open
       && (await page.evaluate(() => state.stnCard.id)) === c);
     check('…and drops the list under it: the trail in order, its station first and marked',
       G.expanded === 'true' && G.drop && G.drop.top >= G.pill.bottom
@@ -331,7 +334,9 @@ async function main() {
         check('…short of the compass', T.pill.right <= T.compass.left - 4, J({ pill: T.pill, compass: T.compass }));
         check('…the scale on the stage\'s right, under the compass', Math.abs(T.scale.right - (T.twinStage.right - 8)) <= 1.5
           && T.scale.top >= T.twinStage.top + 8 + 38 && T.scaleHead.right <= T.twinStage.right - 7, J({ scale: T.scale, compass: T.compass, stage: T.twinStage }));
-        check('…and the card\'s top kept below the pill', T.card && T.card.top >= T.pill.bottom, J({ card: T.card, pill: T.pill }));
+        // Beside the side panel the station is in the panel, not over the twin
+        // (#299); on the map, the card's top is below the pill.
+        check('…and the card\'s top kept below the pill, where the card is on the map', T.open && (!T.card || T.card.top >= T.pill.bottom), J({ card: T.card, pill: T.pill }));
         await page.click('#stn-trail-pill');
         T = await g();
         check('the list drops down over the card and the twin', T.drop && await page.evaluate(() => {

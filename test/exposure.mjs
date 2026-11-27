@@ -457,7 +457,8 @@ try {
     const name = c => (c.getAttribute('aria-label') || c.textContent || c.getAttribute('title') || '').trim();
     const controls = [...el.querySelectorAll('a[href], button, summary, [tabindex]:not([tabindex="-1"])')];
     return {
-      inMain: main.contains(el),
+      // In <main> on the map, or in the side panel's pane beside it (#299).
+      inMain: main.contains(el) || roots.some(r => r.contains(el)),
       skips, headingsInSection: el.querySelectorAll('h1, h2, h3, h4, h5, h6').length,
       role: g.getAttribute('role'), label: label ? label.textContent.trim() : null,
       unnamed: controls.filter(c => !name(c)).map(c => c.outerHTML.slice(0, 60)),

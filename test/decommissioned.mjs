@@ -134,7 +134,8 @@ async function main() {
 
     // ── 1 ──
     log('\nThe two new fields\n');
-    await page.evaluate(id => selectStation(id), id);
+    // Beside the map the form is behind the station's Edit (#299).
+    await page.evaluate(id => { selectStation(id); editStationFromCard(id); }, id);
     await page.waitForTimeout(200);
     let F = await form(page);
     check('an Antenna height box, blank, beside Radio system', F.antenna && F.antenna.value === '' && F.antennaNextToRadio, J(F));
@@ -164,6 +165,7 @@ async function main() {
     }, id);
     check('its pin is greyed, fill and ring', pin && pin.fill === pin.want && pin.ring === pin.want && pin.op < 1, J(pin));
     if (await page.evaluate(id => state.selectedId !== id, id)) await page.evaluate(id => selectStation(id), id);
+    await page.evaluate(id => { if (!state.stnCard.editing) editStationFromCard(id); }, id);
     await page.waitForTimeout(200);
     const card = await page.evaluate(id => {
       const el = document.getElementById('stn-card');

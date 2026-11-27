@@ -315,7 +315,8 @@ try {
 
   // ═════════════════════════════════════════════════════════════════════════
   console.log('\nThe station editor\n');
-  await page.evaluate(id => { if (state.selectedId !== id) selectStation(id); }, river.id);
+  // Beside the map the form is behind the station's Edit (#299).
+  await page.evaluate(id => { if (state.selectedId !== id) selectStation(id); editStationFromCard(id); }, river.id);
   const ED = `#ef-bm-${river.id}`;
   await page.waitForSelector(`${ED} .sb-list li`, { state: 'attached', timeout: 15_000 });
   t = await text(page, ED);

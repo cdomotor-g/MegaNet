@@ -3357,6 +3357,9 @@ function renderDock(opts = {}) {
     document.querySelectorAll('#stations-filter-card .filter-search').forEach(autoGrowSearch);
   }
   dockLastShowing = showing;
+  // The station goes into the panel when it opens, and back onto the map
+  // when it is shut (#299).
+  stnDockFollow();
 }
 
 // ⋮, at the right-hand end of the banner: a phone's way to the side panel on
@@ -3933,6 +3936,10 @@ function dockStripKey(e) {
 // drawers), and a card scrolled into view behind a drawer and its backdrop has
 // not been shown to anybody. So the drawer goes first.
 function dockReveal(el) {
+  // The station form asked for — by Show in the details, a save's message, a
+  // check — while the station is in the side panel: it is behind Edit there,
+  // so it is opened as Edit opens it (#299).
+  if (el && el.closest && el.closest('#stations-editor-card')) stnFormWanted();
   const pane = el && el.closest ? el.closest('#help-panel .dock-pane') : null;
   const was = document.activeElement;
   if (pane) {
@@ -4696,6 +4703,11 @@ function renderStationsHtml() {
                is one map's. State-driven, so it is repainted from initMap()
                after every full render rather than dying with the div. -->
           <div id="stn-card" class="acma-card stn-card" data-tour="station-card" hidden></div>
+          <!-- The station's label by its pin while the side panel is showing
+               the station (#299, syncStnDock): its name and when it was last
+               heard, and a press brings the panel up on it. -->
+          <button type="button" id="stn-label" class="stn-label" data-tour="station-label" hidden
+                  onclick="stnLabelPress()"></button>
           <!-- What is here (#186): the third card in this one rectangle, and
                the only one that is about the ground rather than about something
                on it. Same dress and same exclusion — opening any of the three
@@ -5035,10 +5047,20 @@ function toggleStationsList() {
 // it goes to the toggle, and the station card's Escape comes back there too.
 function pickStationFromList(id) {
   const was = state.selectedId;
+  const body = document.getElementById('stations-list-body');
+  const fromList = !!body && body.contains(document.activeElement);
   selectStation(id);
   if (was === id || state.selectedId !== id) return;
+  // Beside the map the list folds away under the station the pick put in the
+  // side panel (#299), and comes back as it was on ← All stations: it is not
+  // shut, and focus goes to the station — Escape or ← brings it back to the
+  // row it came from (closeStnCard).
+  const card = document.getElementById('stn-card');
+  if (card && !card.hidden && card.classList.contains('is-docked')) {
+    if (fromList) card.focus({ preventScroll: true });
+    return;
+  }
   setStationsListOpen(false);
-  const body = document.getElementById('stations-list-body');
   const btn  = document.getElementById('stations-list-toggle');
   if (btn && body && body.contains(document.activeElement)) {
     btn.focus({ preventScroll: true });
@@ -9579,7 +9601,19 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   if (!(card && opener && card.contains(opener))) state.stnCard.opener = opener;
   if (state.acma.cardDeviceId) closeAcmaCard(false);
   MapHere.close();
+  // A different station is shown, not edited: Edit is pressed for each.
+  if (state.stnCard.id !== id) state.stnCard.editing = false;
   state.stnCard.id = id;
+  // Beside the map the side panel becomes the station (#299): a pick brings
+  // it up on 📍 Stations — a tool's work stays on the map, and its pane is a
+  // press away. Not over the digital twin, whose pane is the twin's own
+  // controls beside it (and whose station follows the card anyway). A link or
+  // Back (select: false) changes no pane, and a shut panel stays shut: the
+  // card is on the map then.
+  if (select && stnCardDocked()) {
+    const on = dockShowing();
+    if (on && on !== 'stations' && !(on === 'twin' && dockToolLive('twin'))) setDockTab('stations', { instant: true });
+  }
   // Looked at: to the head of the session's trail, which the pill in the
   // map's top row names and lists (station-trail.js).
   StationTrail.visit(id);
@@ -9620,8 +9654,12 @@ function repaintStnCard() {
   if (!el) return;                          // not the Stations tab
   const s = state.stnCard.id && state.data
     && state.data.stations.find(x => x.id === state.stnCard.id);
+  // Repeaters listening goes back to its own place before the card's markup
+  // is replaced, or it would go with it (syncStnDock brings it back in).
+  stnParkSlots();
   if (!s) {
-    state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
+    state.stnCard.id = null; state.stnCard.editing = false; el.hidden = true; el.innerHTML = '';
+    syncStnDock();
     StnCardView.closed();
     MapCluster.soon();
     MapLeader.sync();
@@ -9634,11 +9672,18 @@ function repaintStnCard() {
   }
   // The search box is a control too: a repaint while somebody types in it
   // (an editor redraw, a fill that repaints) puts them back where they were.
-  const controls = () => [...el.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')];
+  // Not Repeaters listening's, which is put into the Radio tab after the paint
+  // (syncStnDock) and keeps its own focus across the move.
+  const controls = () => [...el.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')]
+    .filter(c => !c.closest('#stations-carriers-card'));
   const hadFocus = el.contains(document.activeElement);
   const at = hadFocus ? controls().indexOf(document.activeElement) : -1;
   el.hidden = false;
+  // Where the card goes — the side panel or the map — before it is drawn, so
+  // it is drawn for the place it is in (#299).
+  syncStnDock({ paint: false });
   el.innerHTML = stnCardHtml(s);
+  syncStnDock();
   // Each row one line, its long explanation folded behind a tap (card-rows.js)
   // — now, so focus goes back by the same count of controls, and then for
   // every section that fills in after its fetch.
@@ -9759,8 +9804,11 @@ function closeStnCard(refocus = true) {
   if (!el) return;
   const id = state.stnCard.id;
   state.stnCard.id = null;
+  state.stnCard.editing = false;
+  stnParkSlots();                           // Repeaters listening back where it lives
   el.hidden = true;
   el.innerHTML = '';
+  syncStnDock();                            // the list back in the side panel, the label off the map
   StnCardView.closed();                     // no search marks left behind
   MapCluster.soon();                        // its pin may go back into its bubble
   MapLeader.sync();                         // and the leader goes with it
@@ -9805,6 +9853,246 @@ function closeStnCard(refocus = true) {
   }
 }
 
+// ── One station, one place (#299) ────────────────────────────────────────────
+// A picked station used to show in three places at once, each with buttons of
+// its own: this card on the map, Repeaters listening and the Station details
+// form in the side panel. Beside the map on a desktop it is now one: the side
+// panel's 📍 Stations pane *becomes* the station. The card element itself is
+// moved there — never drawn twice, so every module that fills a section by its
+// id fills it wherever the card is — to the head of #stations-cards, and the
+// station list folds away under it until ← All stations. Its header carries
+// the name, its kind, when it was last heard and Edit; under that, a bar of
+// the tools most often run on a station; then the tabs, Overview · Radio ·
+// Flood · Site · Visits (station-card-view.js), Repeaters listening moved into
+// Radio. The form shows only after Edit — or while it holds something not
+// saved, which is never hidden from the person who typed it.
+//
+// The map keeps a small label by the pin (#stn-label): the name and when it
+// was last heard, placed by MapLeader beside the pin it rings. A press on it
+// brings the side panel up on the station.
+//
+// On a phone the side panel is a drawer and there is no room beside the map,
+// so the card stays the sheet it is (owner, 27 Nov 2026); between the two — a
+// tablet's width, the cards under the map — it stays on the map as well.
+//
+// And only while the side panel is open: shut, it is the map somebody wanted
+// all of, and the card is on the map as it always was. Opened again, the
+// station goes back into it (stnDockFollow, from renderDock).
+function stnCardDocked() {
+  return stationsSplitActive() && !isPhoneNav() && !!state.dockOpen
+    && !!document.getElementById('stations-cards');
+}
+
+// The panel opened or shut, or the window crossed the fold: a card that is in
+// the wrong place for it now is drawn again in the right one.
+function stnDockFollow() {
+  const el = document.getElementById('stn-card');
+  if (!el || el.hidden || !state.stnCard.id) return;
+  if (el.classList.contains('is-docked') !== stnCardDocked()) repaintStnCard();
+}
+
+// Put the card where stnCardDocked() says, and everything that follows from
+// that. `paint: false` is the move alone, before the card's markup is drawn
+// for the place it is in.
+let stnHeardHooked = false;
+function syncStnDock({ paint = true } = {}) {
+  const el = document.getElementById('stn-card');
+  if (!el) return;
+  const cards = document.getElementById('stations-cards');
+  const label = document.getElementById('stn-label');
+  const s = state.stnCard.id && state.data && state.data.stations.find(x => x.id === state.stnCard.id);
+  const docked = !!(s && !el.hidden && cards && stnCardDocked());
+  if (docked) {
+    if (cards.firstElementChild !== el) moveCardsKeepingFocus(el, cards, cards.firstElementChild);
+  } else if (label && el.parentNode !== label.parentNode) {
+    moveCardsKeepingFocus(el, label.parentNode, label);
+  }
+  const editing = docked && !!state.stnCard.editing;
+  el.classList.toggle('is-docked', docked);
+  el.classList.toggle('is-editing', editing);
+  if (cards) {
+    cards.classList.toggle('has-station', docked);
+    cards.classList.toggle('shows-form', docked && (editing || !!editorHoldReason()));
+  }
+  if (!paint) return;
+  // Repeaters listening, in the Radio tab — when it is about this station.
+  const car = document.getElementById('stations-carriers-card');
+  const slot = el.querySelector('.stn-cv-slot[data-slot="carriers"]');
+  if (car && slot && docked && state.selectedId === s.id && car.parentNode !== slot) moveCardsKeepingFocus(car, slot);
+  if (label) {
+    const on = docked && s.lat != null && s.lon != null;
+    label.hidden = !on;
+    if (on) {
+      label.innerHTML = stnLabelHtml(s);
+      label.setAttribute('aria-label', `${s.name} — shown in the side panel. Press to bring it up.`);
+      label.title = `${s.name}: its card is in the side panel — press to bring it up there`;
+    } else label.innerHTML = '';
+  }
+  if (!stnHeardHooked && typeof HealthGlance !== 'undefined' && HealthGlance.onHeard) {
+    stnHeardHooked = true;
+    HealthGlance.onHeard(stnHeardChanged);
+  }
+  if (typeof MapLeader !== 'undefined') MapLeader.sync();
+}
+
+// When it was last heard lands after the card is drawn: the header's line and
+// the label are written again in place.
+function stnHeardChanged(id) {
+  const sid = state.stnCard.id;
+  if (!sid || (id != null && id !== sid)) return;
+  const s = state.data && state.data.stations.find(x => x.id === sid);
+  if (!s) return;
+  const head = document.getElementById('stn-dock-heard');
+  if (head) head.innerHTML = HealthGlance.heardHeadHtml(s);
+  const label = document.getElementById('stn-label');
+  if (label && !label.hidden) label.innerHTML = stnLabelHtml(s);
+}
+
+// Repeaters listening back to its own place among the cards — before the
+// card's markup is replaced, which would take it too.
+function stnParkSlots() {
+  const el = document.getElementById('stn-card');
+  const car = document.getElementById('stations-carriers-card');
+  const cards = document.getElementById('stations-cards');
+  if (el && car && cards && el.contains(car)) moveCardsKeepingFocus(car, cards, document.getElementById('blast-card'));
+}
+
+// The side panel's header for the station: ← All stations and Edit either
+// side, the name, its kind and when it was last heard under them.
+function stnDockHeadHtml(s) {
+  const editing = !!state.stnCard.editing;
+  const kind = [
+    ...s.roles.map(r => `<span class="mn-pop-pill" style="--pill:${ROLE_COLOR[r]}">${esc(r)}</span>`),
+    proposedTagHtml(s),
+    !s.proposed && s.station_type ? `<span class="stn-dock-type small">${esc(stationTypeLabel(s.station_type))}</span>` : '',
+  ].join('');
+  const heard = typeof HealthGlance !== 'undefined' ? HealthGlance.heardHeadHtml(s) : '';
+  return `
+    <div class="acma-card-head stn-dock-head">
+      <button type="button" class="link-btn stn-dock-back" onclick="stnCardAllStations()"
+              title="Back to the list of stations — this one is put down">← All stations</button>
+      <button type="button" class="pill stn-dock-edit" aria-pressed="${editing}" onclick="stnCardEdit()"
+              title="${editing ? 'Back to the station’s tabs — the form is put away' : 'Its station details: the form with everything on record about it, to change it'}"
+              >${editing ? '✓ Done' : '✏️ Edit'}</button>
+      <div class="stn-dock-id">
+        <strong id="stn-card-title">${esc(s.name)}</strong>
+        <span class="stn-dock-kind">${kind}</span>
+        <span class="stn-dock-heard small" id="stn-dock-heard">${heard}</span>
+      </div>
+    </div>`;
+}
+
+// The tools most often run on a station, under the header: each opens with
+// this station already picked. More ▸ is the rest of 📻 Radio's list.
+function stnToolBarHtml(s) {
+  const id = escAttr(s.id);
+  const located = s.lat != null && s.lon != null && isFinite(s.lat) && isFinite(s.lon);
+  const ico = k => esc(((typeof Glyphs !== 'undefined' && Glyphs.RAIL[k]) || { emoji: '•' }).emoji);
+  const b = (tool, icon, name, on, title) => `<button type="button" class="stn-dock-tool" data-tool="${tool}"
+      onclick="${on}" title="${escAttr(title)}"><span class="stn-dock-toolic" aria-hidden="true">${icon}</span><span>${esc(name)}</span></button>`;
+  const tools = [
+    located && typeof MapBestRepeater !== 'undefined' && MapBestRepeater.openFor
+      ? b('map-bestrep', ico('bestrep'), 'Best repeater', `MapBestRepeater.openFor('${id}')`,
+        `Best repeater: which repeater would hear ${s.name} best, priced by fade margin the whole way to a base`) : '',
+    located && typeof MapPolar !== 'undefined' && MapPolar.pickCentre
+      ? b('map-polar', ico('coverage'), 'Radio coverage', `stnToolCoverage('${id}')`,
+        `Radio coverage: how far round ${s.name} a radio there would be heard — set on this station, then Draw`) : '',
+    located && typeof MapDig !== 'undefined' && MapDig._station
+      ? b('map-dig', ico('dig'), 'Before you dig', `MapDig._station('${id}')`,
+        `Before you dig: the power lines, cables, pipes, property boundary and soil at ${s.name}`) : '',
+    twinPillHtml(s)
+      ? b('twin', ico('twin'), 'Digital twin', `DigitalTwin.openStation('${id}')`,
+        `Digital twin: ${s.name}’s ground in 3-D, the station as built where it stands`) : '',
+    b('radio', '▸', 'More', `setDockTab('radio')`,
+      'More tools: radio links, a better site, repeater comparison and licences — the 📻 Radio list'),
+  ].filter(Boolean);
+  return `<nav class="stn-dock-tools" aria-label="Tools for this station" data-tour="station-tools">${tools.join('')}</nav>`;
+}
+
+// Radio coverage on this station: its centre set, its pane up.
+function stnToolCoverage(id) {
+  MapPolar.pickCentre(id);
+  setDockTab('map-polar');
+}
+
+// Visits, at its head: the door into the station's inspection history.
+function stnVisitsHtml(s) {
+  if (!s.id || s.proposed || typeof StationInspections === 'undefined' || !StationInspections.openHistory) return '';
+  return `<div class="acma-sect stn-card-visits">
+      <button type="button" class="pill" onclick="StationInspections.openHistory('${escAttr(s.id)}')"
+              title="Open the Inspection History tab on this station: every visit on the forms, and the older paper sheets"
+              >${pillText('📋', 'Its inspection history', '→')}</button>
+    </div>`;
+}
+
+// The form wanted on screen for the station the side panel is showing.
+function stnFormWanted() {
+  const el = document.getElementById('stn-card');
+  if (!el || el.hidden || !el.classList.contains('is-docked') || state.stnCard.editing) return;
+  if (!state.stnCard.id || state.editorId !== state.stnCard.id) return;
+  state.stnCard.editing = true;
+  repaintStnCard();
+}
+
+// The form put away, the tabs back — a tab or a tour asking for one of them
+// (station-card-view.js).
+function stnCardLeaveForm() {
+  if (!state.stnCard.editing) return;
+  state.stnCard.editing = false;
+  repaintStnCard();
+}
+
+// Edit, and ✓ Done: the form is shown in the station's place, and put away.
+function stnCardEdit() {
+  const id = state.stnCard.id;
+  if (!id) return;
+  if (state.stnCard.editing) {
+    state.stnCard.editing = false;
+    repaintStnCard();
+    const b = document.querySelector('#stn-card .stn-dock-edit');
+    if (b) b.focus({ preventScroll: true });
+    return;
+  }
+  editStationFromCard(id);
+}
+
+// ← All stations: the station put down — the card closed and, when nothing in
+// the form is holding it, the selection cleared — and the list back, focus on
+// the station's row in it.
+function stnCardAllStations() {
+  const id = state.stnCard.id;
+  closeStnCard(false);
+  if (id && state.selectedId === id && !editorHoldReason()) {
+    state.selectedId  = null;
+    state.editorId    = null;
+    state.editorDraft = {};
+    state.editorMsg   = null;
+    rerenderStations();
+    rerenderStationEditorCard();
+  }
+  const row = id && document.querySelector(`#stations-table-wrap tr[data-sid="${CSS.escape(id)}"] button`);
+  const to = [row, document.getElementById('stations-list-toggle'), document.getElementById('leaflet-map')]
+    .find(t => t && t.getClientRects().length);
+  if (to) to.focus({ preventScroll: !row });
+  if (row) scrollStationRowIntoView(id);
+}
+
+// The label on the map: its name, and when it was last heard.
+function stnLabelHtml(s) {
+  const heard = typeof HealthGlance !== 'undefined' ? HealthGlance.heardCellHtml(s) : '';
+  return `<span class="stn-label-name">${esc(s.name)}</span>${heard ? `<span class="stn-label-heard">${heard}</span>` : ''}`;
+}
+
+// A press on the label: the side panel up on the station, focus in it.
+function stnLabelPress() {
+  if (dockShowing() !== 'stations') setDockTab('stations');
+  const el = document.getElementById('stn-card');
+  if (el && !el.hidden) {
+    el.scrollIntoView({ block: 'nearest' });
+    el.focus({ preventScroll: true });
+  }
+}
+
 // The phone callout's "Details & actions" pill: the callout gives way to the
 // card — a ~333 px map cannot carry a balloon and a sheet at once — and this
 // is the one open that moves focus in, because it is the one a person asked
@@ -9831,19 +10119,28 @@ function stnCardFromPopup(id, e) {
 // "Station details ↓": the first thing in the app that scrolls the *editor* into
 // view. "Show in the list below" lands on the table row, which is right for a
 // list; someone who pressed Edit wants the form, two cards further down, and
-// was scrolling past the list to find it. Out of full screen first — there is
-// no "below" inside a fixed panel, and the scroll would happen invisibly
-// behind it. focusStation() selects, and re-renders the whole tab when the
+// was scrolling past the list to find it. Under the map (a tablet's width) out
+// of full screen first — there is no "below" inside a fixed panel, and the
+// scroll would happen invisibly behind it; beside it the form opens in the
+// station's place in the side panel, which full screen keeps. focusStation() selects, and re-renders the whole tab when the
 // filters had to move to include the station, so the editor is looked up a
 // frame later, whichever way it was drawn.
 function editStationFromCard(id) {
-  if (state.mapFullscreen) toggleMapFullscreen(false);
+  // Beside the map the form is behind Edit (#299): this is that press — and
+  // the side panel, opened for it if it was shut, is beside a full-screen map
+  // too. Under the map (a tablet) there is no "below" inside a fixed panel.
+  const beside = stationsSplitActive() && !isPhoneNav();
+  if (beside && state.stnCard.id === id) state.stnCard.editing = true;
+  if (!beside && state.mapFullscreen) toggleMapFullscreen(false);
   focusStation(id);
   requestAnimationFrame(() => {
     const card = document.getElementById('stations-editor-card');
     if (!card) return;
     dockReveal(card);
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // In the side panel the station's header stays in sight above the form,
+    // with ✓ Done on it (#299).
+    const top = state.stnCard.editing && stnCardDocked() && document.getElementById('stn-card');
+    (top && !top.hidden ? top : card).scrollIntoView({ behavior: 'smooth', block: 'start' });
     // The first control that has a box: the Undo ahead of the fields is hidden until something changes.
     const first = [...card.querySelectorAll('input:not([disabled]):not([type="hidden"]), select, textarea, button')]
       .find(el => el.getClientRects().length);
@@ -9855,8 +10152,16 @@ function editStationFromCard(id) {
 // the map advertising the Repeaters listening card, rather than that card
 // advertising itself.
 function stnCardScrollToCarriers() {
-  if (state.mapFullscreen) toggleMapFullscreen(false);
   const el = document.getElementById('stations-carriers-card');
+  const card = document.getElementById('stn-card');
+  if (el && card && card.contains(el)) {
+    // In the side panel it is in the card's own Radio tab.
+    StnCardView.go('radio');
+    dockReveal(card);
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (state.mapFullscreen) toggleMapFullscreen(false);
   if (el) { dockReveal(el); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 
@@ -10019,8 +10324,11 @@ function stnCardHtml(s) {
   const selected = state.selectedId === s.id;
   const acts     = stationActionGroups(s);
   const nCarried = carriers.length ? `${carriers.length} repeater${carriers.length === 1 ? '' : 's'}` : '';
+  // In the side panel beside the map, not on it (#299): its own header and
+  // the tool bar, Repeaters listening in Radio, its visits in Visits.
+  const docked   = stnCardDocked();
 
-  const head = `
+  const head = docked ? stnDockHeadHtml(s) : `
     <div class="acma-card-head">
       <span>
         <strong id="stn-card-title">${esc(s.name)}</strong><br>
@@ -10147,6 +10455,7 @@ function stnCardHtml(s) {
   // equipment register (0036, photo-review.js) and the history with Restore
   // (0056, station-history.js).
   const kit = [
+    docked ? stnVisitsHtml(s) : '',
     typeof StationLpu !== 'undefined' ? StationLpu.cardHtml(s) : '',
     typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : '',
     typeof StationHistory !== 'undefined' ? StationHistory.cardHtml(s) : '',
@@ -10200,19 +10509,21 @@ function stnCardHtml(s) {
   const note = `
     <p class="small acma-card-note">
       ${carriers.length ? `Carried by ${nCarried}${selected
-        ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown ${stationsCardsWhere()} ${stationsCardsArrow()}</button>` : ''}. ` : ''}
+        ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown ${docked ? 'under Radio' : `${stationsCardsWhere()} ${stationsCardsArrow()}`}</button>` : ''}. ` : ''}
       ${typeof MapHops !== 'undefined' ? MapHops.cardNoteHtml(s) : ''}
-      ${stnCardEditorNote(selected)}
+      ${stnCardEditorNote(selected, docked)}
     </p>`;
 
   return StnCardView.frame(s, {
     head,
+    docked,
+    bar: docked ? stnToolBarHtml(s) : '',
     // A proposed station says so before anything else on its card (0039):
     // nothing in it is about a station on the ground yet. On every tab.
     proposal: stnCardProposalHtml(s) + stnCardDecommissionedHtml(s),
     // 📻 Radio ends with the ACMA licences near the station (map-acma.js).
     groups: { about, health, data: stnCardDataHtml(s), flood,
-      radio: `${radio}${typeof MapAcma !== 'undefined' ? MapAcma.cardHtml(s) : ''}`, site, kit, act },
+      radio: `${radio}${docked ? '<div class="stn-cv-slot" data-slot="carriers"></div>' : ''}${typeof MapAcma !== 'undefined' ? MapAcma.cardHtml(s) : ''}`, site, kit, act },
     lines, dock, note,
   });
 }
@@ -10221,7 +10532,13 @@ function stnCardHtml(s) {
 // They are after a pin click (editorFollowCard); when they are not, it says
 // why — the editor is holding something not saved, or the card came from a
 // link — and what Station details does about it.
-function stnCardEditorNote(selected) {
+function stnCardEditorNote(selected, docked = false) {
+  if (docked) {
+    if (selected) return 'Edit, at the top, opens its station details.';
+    const held = editorHoldReason();
+    return held ? `The station details under this are holding ${esc(held)} — finish that first, or Edit loads this station there and drops it.`
+      : 'Edit, at the top, loads it into the station details.';
+  }
   const where = stationsCardsWhere();
   const go = `<em>Station details ${stationsCardsArrow()}</em>`;
   if (selected) return `In the station details ${where} as well — ${go} goes to them.`;

@@ -241,7 +241,7 @@ try {
   const [A, B] = ids;
 
   console.log('\nThe section, signed out and signed in\n');
-  await page.evaluate(id => selectStation(id), A);
+  await page.evaluate(id => { selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, A);
   let s = await section(page);
   ok('signed out: the logger is for approved accounts, and nothing is asked',
     s && /approved accounts/.test(s.text) && !db.requests.some(r => /lpu|photo_reading/.test(r.name)), J(s && s.text));
@@ -335,7 +335,7 @@ try {
 
   console.log('\nRefused\n');
   db.refuseLpu = { code: 'PT409', message: 'this station\'s logger details were changed at 2026-10-30 by somebody, after you opened them — reload to see what changed' };
-  await page.evaluate(id => selectStation(id), B);
+  await page.evaluate(id => { selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, B);
   await until(async () => { const x = await section(page); return x && !x.waiting && x.type != null && x.id === B; });
   await page.fill('#ef-lpu-serial_no', 'SN 777');
   await page.evaluate(() => editorSave());
@@ -365,7 +365,7 @@ try {
   // A phone's width: nothing in the section scrolls the page sideways.
   await signIn(page);
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.evaluate(id => selectStation(id), A);
+  await page.evaluate(id => { selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, A);
   await until(async () => { const x = await section(page); return x && !x.waiting && x.type != null; });
   const over = await page.evaluate(() => { const el = document.getElementById('ef-lpu'); return el ? el.scrollWidth - el.clientWidth : -1; });
   ok('375 px: the section does not overflow', over <= 1, String(over));

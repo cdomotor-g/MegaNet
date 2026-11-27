@@ -57,6 +57,16 @@
 // one; the word for its station only — a different station starts with an
 // empty box.
 //
+// ── In the side panel (#299) ────────────────────────────────────────────────
+// Beside the map on a desktop the card is not on the map at all: the side
+// panel's Stations pane becomes the station (app.js, syncStnDock). There it is
+// always Tabs — the panel is the station's page, and the Tabs | List choice
+// is the map card's — and the tabs are Overview · Radio · Flood · Site ·
+// Visits: Kit & records is called Visits there, with the station's inspection
+// history at its head, and Radio holds Repeaters listening. stnCardHtml()
+// says so with `docked`; a header of its own (← All stations, Edit) and a bar
+// of tools come in as `head` and `bar`.
+//
 // After core.js (esc, escAttr) and app.js, whose repaintStnCard() calls
 // apply() after every paint; explainer-tour.js calls reveal() before it rings
 // a part of the card a tab is hiding. Nothing runs at load.
@@ -93,12 +103,20 @@ const StnCardView = (() => {
     { id: 'act',    title: 'Actions',       short: 'Actions', q: 'Everything the card can do with it' },
   ];
   const BY = Object.fromEntries(GROUPS.map(g => [g.id, g]));
+  // What a group is called in the side panel, where it differs.
+  const DOCKED_AS = {
+    kit: { id: 'kit', title: 'Visits', short: 'Visits', q: 'Who has been, what is fitted here, and who changed it' },
+  };
+  const meta = id => (S.docked && DOCKED_AS[id]) || BY[id];
 
   // What each view's first page shows in full; the rest are a tab, or a page.
   const HOME = { tabs: ['about', 'health', 'data'], list: ['about', 'health'] };
   // The groups with a tab (Actions is the foot's All actions) and the ones
   // with a row in the list (the owner and Health are on the summary itself).
   const TABBED = ['flood', 'radio', 'site', 'kit'];
+  // …and in the side panel, in the order the station's page reads.
+  const TABBED_DOCKED = ['radio', 'flood', 'site', 'kit'];
+  const tabbed = () => (S.docked ? TABBED_DOCKED : TABBED);
   const LISTED = ['data', 'flood', 'radio', 'site', 'kit', 'act'];
 
   const S = {
@@ -106,10 +124,12 @@ const StnCardView = (() => {
     at: { tabs: '', list: '' },         // '' is Overview / the summary
     q: '', qFor: null,                  // the word, and the station it is for
     present: [],                        // the groups this station's card has
+    docked: false,                      // in the side panel, not on the map
     obs: null, pend: 0,
   };
 
   function view() {
+    if (S.docked) return 'tabs';
     if (S.view == null) {
       let v = null;
       try { v = localStorage.getItem(VIEW_KEY); } catch (_) {}
@@ -126,11 +146,12 @@ const StnCardView = (() => {
   // dock: [html], note } from stnCardHtml(). A group with nothing in it is
   // left out, tab and row and all.
   function frame(s, p) {
+    S.docked = !!p.docked;
     const v = view();
     if (S.qFor !== s.id) { S.q = ''; S.qFor = s.id; }
     S.present = GROUPS.map(g => g.id).filter(id => String(p.groups[id] || '').trim());
     const has = id => S.present.includes(id);
-    const panels = GROUPS.filter(g => has(g.id)).map(g => panelHtml(g, p.groups[g.id])).join('');
+    const panels = GROUPS.filter(g => has(g.id)).map(g => panelHtml(meta(g.id), p.groups[g.id])).join('');
     const rows = (ids, head) => {
       const list = ids.filter(has);
       return list.length ? `<nav class="stn-cv-nav stn-cv-${v === 'tabs' ? 'digest' : 'index'}" aria-label="${escAttr(head)}">
@@ -141,6 +162,7 @@ const StnCardView = (() => {
     return `
     <div class="stn-cv-top">
       ${p.head}
+      ${p.bar || ''}
       <div class="stn-cv-tools">
         <div class="stn-cv-search" role="search">
           ${icon('search', 14)}
@@ -149,12 +171,12 @@ const StnCardView = (() => {
                  aria-describedby="stn-cv-hits" autocomplete="off" spellcheck="false"
                  oninput="StnCardView.search(this.value)" onkeydown="StnCardView.qKey(event)">
         </div>
-        <div class="stn-cv-views" role="group" aria-label="Lay the card out as">
+        ${S.docked ? '' : `<div class="stn-cv-views" role="group" aria-label="Lay the card out as">
           <button type="button" class="stn-cv-view" aria-pressed="${v === 'tabs'}" onclick="StnCardView.setView('tabs')"
                   title="Tabs: an overview, then a tab for each group">Tabs</button>
           <button type="button" class="stn-cv-view" aria-pressed="${v === 'list'}" onclick="StnCardView.setView('list')"
                   title="List: a summary, then each group as a page of its own">List</button>
-        </div>
+        </div>`}
       </div>
       ${v === 'tabs' ? tabsHtml() : backHtml()}
       <p class="stn-cv-hits small" id="stn-cv-hits" role="status" aria-live="polite" hidden></p>
@@ -162,7 +184,7 @@ const StnCardView = (() => {
     <div class="stn-cv-body">
       ${p.proposal || ''}
       ${panels}
-      ${v === 'tabs' ? rows(TABBED, 'On the other tabs') : rows(LISTED, 'Everything on this card')}
+      ${v === 'tabs' ? rows(tabbed(), 'On the other tabs') : rows(LISTED, 'Everything on this card')}
       ${v === 'list' ? pagerHtml() : ''}
       <div class="stn-cv-none" hidden>
         <p class="stn-cv-none-h"></p>
@@ -174,8 +196,8 @@ const StnCardView = (() => {
   }
 
   function panelHtml(g, html) {
-    const tabbed = view() === 'tabs' && TABBED.includes(g.id);
-    return `<section class="stn-grp" data-grp="${g.id}" id="stn-grp-${g.id}"${tabbed
+    const isTab = view() === 'tabs' && tabbed().includes(g.id);
+    return `<section class="stn-grp" data-grp="${g.id}" id="stn-grp-${g.id}"${isTab
         ? ` role="tabpanel" aria-labelledby="stn-cv-tab-${g.id}"` : ` aria-label="${escAttr(g.title)}"`}>
       <div class="stn-grp-head"><span class="stn-cv-ic">${icon(g.id, 16)}</span>
         <span class="stn-grp-names"><h3 class="stn-grp-h">${esc(g.title)}</h3><span class="stn-grp-q small">${esc(g.q)}</span></span></div>
@@ -186,7 +208,7 @@ const StnCardView = (() => {
 
   function tabsHtml() {
     const tabs = [{ id: 'overview', short: 'Overview', title: 'Overview', q: 'who owns it, its health and its data, and a line from each of the other tabs' }]
-      .concat(TABBED.filter(id => S.present.includes(id)).map(id => BY[id]));
+      .concat(tabbed().filter(id => S.present.includes(id)).map(meta));
     return `<div class="stn-cv-tabs" role="tablist" aria-label="Parts of this card" onkeydown="StnCardView.tabKey(event)">
       ${tabs.map(t => `<button type="button" role="tab" class="stn-cv-tab" id="stn-cv-tab-${t.id}" data-grp="${t.id}"
           ${t.id === 'overview' ? '' : `aria-controls="stn-grp-${t.id}"`} aria-selected="false" tabindex="-1"
@@ -210,7 +232,7 @@ const StnCardView = (() => {
   }
 
   function rowHtml(id, line) {
-    const g = BY[id];
+    const g = meta(id);
     return `<button type="button" class="stn-cv-row" data-grp="${id}" onclick="StnCardView.go('${id}')">
         <span class="stn-cv-ic">${icon(id, 15)}</span>
         <span class="stn-cv-row-t"><span class="stn-cv-row-h">${esc(g.title)}</span><span class="stn-cv-row-s small">${esc(line || g.q)}</span></span>
@@ -251,6 +273,7 @@ const StnCardView = (() => {
     el.dataset.cv = v;
     el.dataset.cvMode = mode;
     el.dataset.cvAt = at;
+    el.dataset.cvDocked = S.docked ? 'true' : 'false';
     for (const g of body.querySelectorAll(':scope > .stn-grp')) {
       const id = g.dataset.grp;
       g.hidden = mode === 'home' ? !HOME[v].includes(id) : mode === 'group' ? id !== at : false;
@@ -283,7 +306,15 @@ const StnCardView = (() => {
     runSearch(el, body);
     watch(el);
     pads(el);
-    if (moved) el.scrollTop = 0;
+    if (moved) {
+      el.scrollTop = 0;
+      // In the side panel the pane is the scroller: its top back to the card's.
+      const pane = S.docked && el.closest('.dock-pane');
+      if (pane) {
+        const off = el.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+        if (off < 0) pane.scrollTop += off;
+      }
+    }
   }
 
   // How tall the band at the top and the foot are, for the card's scroll
@@ -301,7 +332,17 @@ const StnCardView = (() => {
     const v = view();
     S.at[v] = id && BY[id] ? id : '';
     if (S.q) { S.q = ''; const box = document.getElementById('stn-cv-q'); if (box) box.value = ''; }
+    // A tab asked for while the side panel shows the form: the form goes away
+    // and the tab comes up, as ✓ Done would (app.js).
+    if (leaveForm()) return;
     apply(true);
+  }
+
+  function leaveForm() {
+    const el = card();
+    if (!el || !el.classList.contains('is-editing') || typeof stnCardLeaveForm !== 'function') return false;
+    stnCardLeaveForm();
+    return true;
   }
 
   // The next or the previous page, in the list's order, round the end.
@@ -358,12 +399,12 @@ const StnCardView = (() => {
     const box = document.getElementById('stn-cv-q');
     if (box) box.value = '';
     S.at[v] = HOME[v].includes(id) ? '' : id;
-    apply(false);
+    if (!leaveForm()) apply(false);
     return true;
   }
 
   // Which group is on show, for a test or a tour: { view, at, q }.
-  function current() { return { view: view(), at: place(), q: S.q }; }
+  function current() { return { view: view(), at: place(), q: S.q, docked: S.docked }; }
 
   // ── the search ─────────────────────────────────────────────────────────────
 
@@ -437,13 +478,13 @@ const StnCardView = (() => {
     const ranges = [], found = [];
     let n = 0;
     for (const g of body.querySelectorAll(':scope > .stn-grp')) {
-      const meta = BY[g.dataset.grp];
+      const m = meta(g.dataset.grp);
       openFolds(g, q);
       const at = hitsIn(g, q).filter(h => visible(h.n.parentElement));
-      const whole = meta && meta.title.toLowerCase().includes(q);
+      const whole = m && m.title.toLowerCase().includes(q);
       if (!at.length && !whole) { g.hidden = true; continue; }
       g.hidden = false;
-      found.push(meta ? meta.title : g.dataset.grp);
+      found.push(m ? m.title : g.dataset.grp);
       n += at.length;
       for (const h of at) {
         try { const r = new Range(); r.setStart(h.n, h.i); r.setEnd(h.n, h.i + q.length); ranges.push(r); } catch (_) {}

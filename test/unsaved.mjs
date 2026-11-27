@@ -107,7 +107,16 @@ async function openStations(browser, server, errors, contextOpts) {
   return { context, page };
 }
 
-const select = (page, id) => page.evaluate(id => selectStation(id), id);
+// Beside the map a selection puts the station in the side panel and its form
+// is behind Edit (#299): the form these checks type into is shown as Edit
+// shows it.
+const select = (page, id) => page.evaluate(id => {
+  selectStation(id);
+  if (state.stnCard.id === id && stnCardDocked() && !state.stnCard.editing) {
+    state.stnCard.editing = true;
+    repaintStnCard();
+  }
+}, id);
 
 async function main() {
   const server = await startServer();

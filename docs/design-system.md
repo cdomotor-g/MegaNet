@@ -733,6 +733,21 @@ to write it down rather than let each of them re-derive a different half.
     never redraws, so an open fold stays open. A tour that rings a part a tab is
     hiding asks `StnCardView.reveal()` first.
 
+    **In the side panel it is the station's page** *(#299, 27 Nov 2026)*.
+    Beside the map, with the side panel open, the card is not on the map: the
+    same element is moved to the head of the 📍 Stations pane and the station
+    list folds away under it (*The two rails*, below). There it is always
+    Tabs, and they are **Overview · Radio · Flood · Site · Visits** — Kit &
+    records is called Visits there, with the station's inspection history at
+    its head, and Radio holds Repeaters listening. Its header is
+    **← All stations** and **Edit** either side, then the name, its kind and
+    when it was last heard; under the header a bar of the tools most often run
+    on a station, each opened with it picked. The form is behind Edit (✓ Done
+    puts it away), except while it holds something not saved, which is never
+    hidden from whoever typed it. The map keeps a small label by the pin — its
+    name and last heard, with the gold leader running from it to the ring —
+    and a press on it brings the panel back to the station.
+
 18. **On the station card, a row is one line** *(card-rows.js, 5 Nov 2026)*.
     The label in a column of its own, the answer beside it starting at the same
     place on every row, a rule between rows — never the answer pushed to the
@@ -1151,6 +1166,25 @@ it keeps:
   tabs between them. 🔍 and ⛰️ stand under it, and ↺ last.
 - **Search finds tools** (`STATIONS_TOOLS`, read by `palette.js`), from any
   tab, by name or by the words a person would use for them.
+
+**A picked station is the Stations pane** (#299; `app.js`, `syncStnDock`).
+A station shows in one place, not three: picked beside the map, the station
+card moves into 📍 Stations, at its head, and the list folds away under it —
+not shut, so ← All stations brings it back as it was, with focus on the row the
+station came from. The rules it keeps:
+
+- **One element, moved.** The card is never drawn twice; every module that fills
+  a section by its id fills it wherever the card is. Repeaters listening is moved
+  into the card's Radio tab the same way, and back out before each repaint.
+- **The panel decides.** Only while the side panel is open: shut, the card is on
+  the map as it always was, × and all; opened again, the station goes back in
+  (`stnDockFollow`, from `renderDock`). A pick brings the panel to 📍 — a tool's
+  work stays on the map, its pane a press away — except over the digital twin,
+  whose pane is the twin's own controls; the label by the pin says where the
+  station is whenever its pane is not up.
+- **A phone keeps its sheet.** There the side panel is a drawer over the map,
+  with no room beside it, so the card stays the sheet it is; between the two (a
+  tablet, the cards under the map) it stays on the map too.
 
 The strip scrolls when it is taller than the window, which now takes a very
 short window; its rail is as wide as the nav's (56 px) so that a thin

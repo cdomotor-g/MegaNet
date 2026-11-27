@@ -27,7 +27,32 @@
     "title": "#stn-card-title",
     "owner": "[data-tour='card-owner']",
     "health": "[data-tour='card-health']",
+    "data": "[data-tour='card-data']",
+    "tools": "[data-tour='station-tools']",
+    "label": "[data-tour='station-label']"
+   },
+   "css": ".look-intro { display: none !important; }"
+  },
+  {
+   "name": "station-card-data",
+   "path": "?tab=stations&station=brisbane_city_al",
+   "ready": "[data-tour='station-card']",
+   "settle": 4000,
+   "steps": [
+    {
+     "scroll": "[data-tour='card-health']"
+    },
+    {
+     "wait": 800
+    }
+   ],
+   "targets": {
+    "card": "[data-tour='station-card']",
+    "title": "#stn-card-title",
     "data": "[data-tour='card-data']"
+   },
+   "store": {
+    "mn-hint-display": "1"
    },
    "css": ".look-intro { display: none !important; }"
   },

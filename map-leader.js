@@ -72,6 +72,14 @@
 // The twin draws its pins somewhere neither map can say, and no leader shows
 // over it (styles.css hides it).
 //
+// ── Beside the side panel (#299) ─────────────────────────────────────────────
+// On a desktop the station is in the side panel, not on the map (app.js,
+// syncStnDock), and the map keeps only a small label by the pin — its name and
+// when it was last heard. The leader is the label's then: the label is placed
+// here, beside the pin, on every redraw (placeLabel), and the line runs from
+// it to the ring the way it runs from the card. A label is never over its own
+// pin, so the ring always shows; past the map's edge it is hidden with it.
+//
 // ── Keeping up ───────────────────────────────────────────────────────────────
 //
 // Redrawn on every `move` (a drag, a pan animation, a pinch), on `resize`, when
@@ -202,9 +210,46 @@ const MapLeader = (function () {
   // move it — the card stands in the map's stage, not on the map — and a
   // measure on every frame of a pan or a zoom's animation was two layouts of
   // the page a frame on a laptop with nothing to spare.
+  // What the leader leaves from: the card on the map, or the label by the pin
+  // while the card is in the side panel.
+  function docked() {
+    const card = document.getElementById('stn-card');
+    return !!card && card.classList.contains('is-docked');
+  }
+  function boxEl() {
+    return document.getElementById(docked() ? 'stn-label' : 'stn-card');
+  }
+
+  const LABEL_GAP = 16;   // px from the pin's centre, past its radius, to the label
+  // The label beside the pin, on its right — on its left where the right
+  // would run past the map's edge — and centred on it; hidden while the pin
+  // is off the map or in the twin.
+  function placeLabel(t, v) {
+    const lab = document.getElementById('stn-label');
+    if (!lab) return;
+    const want = docked() && !!t && !!v && !twin();
+    const p = want ? v.pin(t.latlng, t.marker) : null;
+    const size = map.getSize();
+    const inside = !!p && p.x >= 0 && p.y >= 0 && p.x <= size.x && p.y <= size.y;
+    lab.classList.toggle('is-off', !inside);
+    if (!inside) return;
+    const host = lab.offsetParent || lab.parentElement;
+    if (!host) return;
+    const m = map.getContainer().getBoundingClientRect(), h = host.getBoundingClientRect();
+    const w = lab.offsetWidth, ht = lab.offsetHeight;
+    let x = p.x + p.r + LABEL_GAP;
+    if (x + w > size.x - 4) x = p.x - p.r - LABEL_GAP - w;
+    x = Math.max(4, x);
+    const y = Math.max(4, Math.min(size.y - ht - 4, p.y - ht / 2));
+    const left = `${Math.round(x + m.left - h.left)}px`, top = `${Math.round(y + m.top - h.top)}px`;
+    // Tokens, not inline geometry: styles.css places it from them.
+    if (lab.style.getPropertyValue('--stn-label-x') !== left) lab.style.setProperty('--stn-label-x', left);
+    if (lab.style.getPropertyValue('--stn-label-y') !== top) lab.style.setProperty('--stn-label-y', top);
+  }
+
   let boxMemo = null;     // { card, box } as last measured
   function cardBox(fresh = true) {
-    const card = document.getElementById('stn-card');
+    const card = boxEl();
     if (!map || !card || card.hidden) { boxMemo = null; return null; }
     if (!fresh && boxMemo && boxMemo.card === card) return boxMemo.box;
     const r = card.getBoundingClientRect();
@@ -364,12 +409,16 @@ const MapLeader = (function () {
     // point at — paint only, never its size: this runs inside the card's own
     // ResizeObserver.
     const card = document.getElementById('stn-card');
-    if (card) card.classList.toggle('mn-leader-card', !!t && !card.hidden);
+    if (card) card.classList.toggle('mn-leader-card', !!t && !card.hidden && !docked());
     const v = view();
     // Into the 3-D canvas while it is up, and back into the pane after.
     if (v && svg.parentNode !== v.el) v.el.appendChild(svg);
     let on = false;
-    const box = t && v ? cardBox(measure !== false) : null;
+    // The label goes with its pin, and is measured where it now is.
+    placeLabel(t, v);
+    const lab = docked() ? document.getElementById('stn-label') : null;
+    const box = t && v && !(lab && (lab.hidden || lab.classList.contains('is-off')))
+      ? cardBox(measure !== false || !!lab) : null;
     if (box) {
       const p = v.pin(t.latlng, t.marker);
       if (p && !covered(box, p)) { place(box, p, p.r); on = true; }
@@ -468,6 +517,8 @@ const MapLeader = (function () {
         ro = new ResizeObserver(() => render());
         const card = document.getElementById('stn-card');
         if (card) ro.observe(card);
+        const lab = document.getElementById('stn-label');
+        if (lab) ro.observe(lab);
         ro.observe(map.getContainer());
       }
       render();
@@ -533,7 +584,7 @@ const MapLeader = (function () {
     // 2-D map follows the camera when it stops, as it does after a drag.
     reveal() {
       flush();
-      if (!map || twin()) return;
+      if (!map || twin() || docked()) return;
       const t = target();
       const v = t && view();
       const box = v && cardBox();
@@ -566,7 +617,7 @@ const MapLeader = (function () {
     // camera off its station by some other amount. The station goes in the
     // middle of the view, which the card does not reach on a desktop.
     centreFor(latlng, zoom) {
-      if (!map || solid() || twin()) return latlng;
+      if (!map || solid() || twin() || docked()) return latlng;
       const box = cardBox();
       const area = box && openArea(box);
       if (!area) return latlng;

@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 295, date: '2026-11-27', items: [
+      '📍 <strong>One station, one place.</strong> Pick a station on the Stations map and the side panel becomes that station: '
+        + 'its name, what kind it is and when it was last heard at the top, with <em>← All stations</em> to go back to the list and '
+        + '<em>Edit</em> for its details form. Under that, the tools you run on a station most — <em>Best repeater</em>, <em>Radio coverage</em>, '
+        + '<em>Before you dig</em>, <em>Digital twin</em> and <em>More</em> — each opened with the station already picked.',
+      '🗂️ Its tabs are <em>Overview</em>, <em>Radio</em> (with the repeaters that hear it), <em>Flood</em>, <em>Site</em> and <em>Visits</em> '
+        + '(its inspection history, its logger and equipment, and who changed what). The map keeps a small label by the pin; press it to bring the station back up.',
+      'With the side panel shut, or on a phone, the station’s card is on the map as before.',
+    ] },
     { n: 294, date: '2026-11-27', items: [
       '🧭 <strong>A tidier side panel on the Stations map.</strong> Its rail has four buttons now instead of twenty-five: '
         + '<em>Stations</em>, <em>Places</em>, <em>Radio</em> and <em>Site</em>. <em>Radio</em> and <em>Site</em> each open a list of their tools, '

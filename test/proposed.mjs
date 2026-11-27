@@ -152,6 +152,8 @@ const card = page => page.evaluate(() => {
            tag: !!el.querySelector('.acma-card-head .proposed-tag') };
 });
 
+// Beside the map a station's form is behind its Edit (#299): the selections
+// below press it.
 async function main() {
   const server = await startServer();
   const browser = await launchBrowser();
@@ -256,7 +258,7 @@ async function main() {
 
     // A station that is not proposed carries none of it — only its type, where
     // one is recorded (manual or automatic, since Oct 2026), and no other.
-    await page.evaluate(() => selectStation('gatton'));
+    await page.evaluate(() => { selectStation('gatton'); if (state.selectedId === 'gatton') editStationFromCard('gatton'); });
     await page.waitForTimeout(150);
     const plain = await page.evaluate(() => {
       const d = editorReadForm();
@@ -274,7 +276,7 @@ async function main() {
 
     // ── Who may ──
     log('\nWho may\n');
-    await page.evaluate(id => selectStation(id), id);
+    await page.evaluate(id => { selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, id);
     await page.waitForTimeout(150);
     E = await editor(page);
     check('an editor on a saved proposal: the Proposed box is locked, and says why', E.box && E.box.checked && E.box.disabled
@@ -285,6 +287,8 @@ async function main() {
     const edited = db.saves[db.saves.length - 1];
     check('…and may still date it forward, and save', edited.doc.proposed === true && edited.doc.proposed_year === YEAR + 3 && !!edited.stamp, J(edited.doc));
 
+    // + New is in the list's head, which is back once the station is put down.
+    await page.evaluate(() => { if (state.stnCard.id) stnCardAllStations(); });
     await page.click('#stations-list-card .stations-card-actions button:nth-child(2)');
     await page.waitForTimeout(150);
     E = await editor(page);
@@ -307,7 +311,7 @@ async function main() {
     // An administrator establishes the proposal.
     who.admin = true;
     await signIn(page, 'admin');
-    await page.evaluate(id => selectStation(id), id);
+    await page.evaluate(id => { selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, id);
     await page.waitForTimeout(150);
     E = await editor(page);
     check('an administrator\'s Proposed box is not locked', E.box && E.box.checked && !E.box.disabled, J(E.box));
@@ -330,7 +334,7 @@ async function main() {
     // ── What is here ──
     log('\nProposing at a point on the map\n');
     await page.evaluate(() => { state.map.setView([-27.62, 152.41], 13, { animate: false }); MapHere.arm(true); });
-    await page.evaluate(() => state.map.fire('click', { latlng: L.latLng(-27.6234567891, 152.4123456789), originalEvent: new MouseEvent('click') }));
+    await page.evaluate(() => { state.map.fire('click', { latlng: L.latLng(-27.6234567891, 152.4123456789), originalEvent: new MouseEvent('click') }); });
     await page.waitForFunction(() => { const c = document.getElementById('here-card'); return c && !c.hidden; }, null, { timeout: 10_000 });
     const pillText = await page.evaluate(() => [...document.querySelectorAll('#here-card button.pill')].map(b => b.textContent.trim()));
     check('What is here offers to propose a station at its point', pillText.includes('📌 Propose a station here'), J(pillText));

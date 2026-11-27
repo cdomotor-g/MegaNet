@@ -286,7 +286,8 @@ async function main() {
     const { context, page } = await openStations(browser, server, errors, { viewport: { width: 1440, height: 1000 } });
 
     // The editor's boxes, off a row added to it and taken away again.
-    await page.evaluate(id => selectStation(id), sloped.id);
+    // Beside the map the form is behind the station's Edit (#299).
+    await page.evaluate(id => { selectStation(id); editStationFromCard(id); }, sloped.id);
     await page.waitForSelector('#ef-rhs-aep_levels');
     const keys = await page.evaluate(() => {
       RiverDetails.addRow('aep_levels');

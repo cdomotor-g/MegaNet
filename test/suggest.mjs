@@ -191,7 +191,9 @@ async function main() {
 
     // ═══════════════════════════════════════════════════════════════════════
     log('\n3. The Stations card\n');
-    await page.evaluate(() => { if (state.filtersOpen) toggleStationFilters(); clearSearch(); });
+    // The station the search above opened is in the side panel, with the list
+    // folded away under it (#299): put down, as ← All stations puts it.
+    await page.evaluate(() => { closeStnCard(false); if (state.filtersOpen) toggleStationFilters(); clearSearch(); });
     await page.fill('#station-search-quick', 'jimpy');
     await page.waitForFunction(() => /Did you mean/.test((document.getElementById('map-match-note') || {}).textContent || ''), null, { timeout: 5_000 });
     let note = await page.evaluate(() => {
