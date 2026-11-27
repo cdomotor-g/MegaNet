@@ -1820,6 +1820,28 @@ try {
     await page.waitForTimeout(500);
     r = await rail();
     check('…the toggle brings them back', r.names && r.stripW === 215 && r.stored === 'shown' && r.leafletW === r.mapClientW, JSON.stringify(r));
+    // The toggle stays in view when the rail is scrolled: a short window makes
+    // the strip scroll, and scrolled to its end the toggle is still at its top.
+    for (const names of [true, false]) {
+      if (!names) { await page.click('#help-panel .dock-names'); await page.waitForTimeout(400); }
+      await page.setViewportSize({ width: 1440, height: 420 });
+      await page.waitForTimeout(400);
+      const pin = await page.evaluate(() => {
+        const strip = document.querySelector('#help-panel .dock-strip');
+        const t = strip.querySelector('.dock-names').getBoundingClientRect();
+        strip.scrollTop = strip.scrollHeight;
+        const sr = strip.getBoundingClientRect(), t2 = strip.querySelector('.dock-names').getBoundingClientRect();
+        const at = document.elementFromPoint(t2.left + t2.width / 2, t2.top + t2.height / 2);
+        return { scrolls: strip.scrollHeight > strip.clientHeight, moved: strip.scrollTop > 0,
+                 gap: Math.round(t2.top - sr.top), was: Math.round(t.top - sr.top), hit: !!(at && at.closest('.dock-names')) };
+      });
+      check('the toggle stays in view when the rail (' + (names ? 'names' : 'icons') + ') is scrolled to its end',
+        pin.scrolls && pin.moved && pin.gap >= 0 && pin.gap <= 12 && pin.hit, JSON.stringify(pin));
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.waitForTimeout(300);
+    }
+    await page.click('#help-panel .dock-names');
+    await page.waitForTimeout(500);
     // Every other tab: ❔ alone, no names.
     await page.evaluate(() => switchTab('mapgen'));
     await page.waitForTimeout(600);
