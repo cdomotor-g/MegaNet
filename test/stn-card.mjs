@@ -1337,6 +1337,50 @@ async function main() {
     check('← All stations puts the station down: the card gone, the selection cleared, the list back',
       d6.closed && d6.deselected && d6.list && d6.label, JSON.stringify(d6));
     check('…focus on that station\'s row in the list', d6.row === d6.want, JSON.stringify(d6));
+
+    // + Propose and + New on the station's own header: the list's pair fold
+    // away with the list. A press puts the station down and opens the blank
+    // form; with something in the form not saved, it is never thrown away.
+    const pick = async () => {
+      await dp.evaluate(`(() => {
+        const m = ${lonePin(0)};
+        m.fire('click', { originalEvent: new MouseEvent('click'), latlng: m.getLatLng() });
+      })()`);
+      await dp.waitForTimeout(500);
+    };
+    await pick();
+    const d7 = await dp.evaluate(() => ({
+      docked: document.getElementById('stn-card').classList.contains('is-docked'),
+      btns: [...document.querySelectorAll('#stn-card .stn-dock-head .stn-dock-add')].map(b => b.textContent.trim()),
+      titled: [...document.querySelectorAll('#stn-card .stn-dock-add')].every(b => (b.title || '').length > 20),
+      listShown: document.getElementById('stations-list-card').getClientRects().length > 0,
+    }));
+    check('the docked header carries + Propose and + New (the list, folded away, does not)',
+      d7.docked && d7.btns.join('|') === '+ Propose|+ New' && d7.titled && !d7.listShown, JSON.stringify(d7));
+    await dp.click('#stn-card .stn-dock-add:first-child');
+    await dp.waitForTimeout(700);
+    const d8 = await dp.evaluate(() => ({
+      closed: document.getElementById('stn-card').hidden && state.stnCard.id === null,
+      draft: !state.editorId && !!state.editorDraft.proposed && state.editorDraft.lat == null,
+      form: document.getElementById('stations-editor-card').getClientRects().length > 0,
+      focus: document.activeElement && document.activeElement.id,
+    }));
+    check('+ Propose puts the station down and opens a blank proposal, focus in its name',
+      d8.closed && d8.draft && d8.form && d8.focus === 'ef-name', JSON.stringify(d8));
+    // Something unsaved is in the form (the proposal is not saved): a station
+    // picked now, and + New pressed on it, must not drop that.
+    await dp.evaluate(() => { state.editorDraft.name = 'Kept draft'; });
+    await pick();
+    await dp.click('#stn-card .stn-dock-add:nth-child(2)');
+    await dp.waitForTimeout(400);
+    const d9 = await dp.evaluate(() => ({
+      kept: state.editorDraft.name === 'Kept draft' && !!state.editorDraft.proposed,
+      stillCard: !document.getElementById('stn-card').hidden,
+      form: document.getElementById('stations-editor-card').getClientRects().length > 0,
+      said: document.getElementById('app-status').textContent,
+    }));
+    check('+ New with a draft not saved keeps the draft and the form, and says why',
+      d9.kept && d9.stillCard && d9.form && /holding/.test(d9.said), JSON.stringify(d9));
     await dk.context.close();
 
     // ── The card's two layouts and its search (station-card-view.js) ──────

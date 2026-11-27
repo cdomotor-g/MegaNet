@@ -9974,9 +9974,17 @@ function stnDockHeadHtml(s) {
     <div class="acma-card-head stn-dock-head">
       <button type="button" class="link-btn stn-dock-back" onclick="stnCardAllStations()"
               title="Back to the list of stations — this one is put down">← All stations</button>
-      <button type="button" class="pill stn-dock-edit" aria-pressed="${editing}" onclick="stnCardEdit()"
-              title="${editing ? 'Back to the station’s tabs — the form is put away' : 'Its station details: the form with everything on record about it, to change it'}"
-              >${editing ? '✓ Done' : '✏️ Edit'}</button>
+      <span class="stn-dock-acts">
+        <button type="button" class="pill stn-dock-add" onclick="stnCardAdd(true)"
+                title="Propose a station: where one is meant to go, what kind it will be, and the year it is proposed for. This station is put down first."
+                >+ Propose</button>
+        <button type="button" class="pill stn-dock-add" onclick="stnCardAdd(false)"
+                title="Add a station to the register. This station is put down first."
+                >+ New</button>
+        <button type="button" class="pill stn-dock-edit" aria-pressed="${editing}" onclick="stnCardEdit()"
+                title="${editing ? 'Back to the station’s tabs — the form is put away' : 'Its station details: the form with everything on record about it, to change it'}"
+                >${editing ? '✓ Done' : '✏️ Edit'}</button>
+      </span>
       <div class="stn-dock-id">
         <strong id="stn-card-title">${esc(s.name)}</strong>
         <span class="stn-dock-kind">${kind}</span>
@@ -10057,6 +10065,24 @@ function stnCardEdit() {
     return;
   }
   editStationFromCard(id);
+}
+
+// + Propose and + New, on the station's own header: the list's two buttons
+// fold away with the list, and a station somebody is looking at is the very
+// moment they think of the one next to it. This station is put down — the
+// list and the blank form come back in its place — unless the form is holding
+// something not saved, which is never thrown away on a press here: the form is
+// brought up instead, with the reason said.
+function stnCardAdd(propose) {
+  const held = editorHoldReason();
+  if (held) {
+    announce(`Not yet — the station details are holding ${held}. Save or undo that first.`);
+    editorReveal(null);
+    return;
+  }
+  closeStnCard(false);
+  if (propose) editorPropose();
+  else { editorNew(); editorReveal(); }
 }
 
 // ← All stations: the station put down — the card closed and, when nothing in

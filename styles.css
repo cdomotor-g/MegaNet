@@ -11663,7 +11663,8 @@ body .map-panel.is-driving {
   gap: .3rem .5rem;
 }
 .stn-dock-back { justify-self: start; font-size: .82rem; }
-.stn-dock-edit { justify-self: end; }
+.stn-dock-acts { justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .3rem; }
+.stn-dock-add { font-size: .8rem; }
 .stn-dock-edit[aria-pressed="true"] { border-color: var(--accent); background: var(--subtle); font-weight: 600; }
 .stn-dock-id { grid-column: 1 / -1; display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
 .stn-dock-id > strong { font-size: 1.05rem; line-height: 1.25; overflow-wrap: anywhere; }
