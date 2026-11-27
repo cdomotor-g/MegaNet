@@ -2072,6 +2072,14 @@ jobs:
         working-directory: test
         run: npm run alert2ids
 
+      # Node only. The 🧪 Path test planner on the Pass Ranges tab
+      # (alert-test.js): the addresses only one repeater answers, the stepped
+      # set and what it says of the fade margin, and the arrival check's query.
+      - name: Path test planner — safe addresses, fade-margin steps, arrivals
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run alerttest
+
       # Node, then Chromium. The 🎓 Radio Propagation tab (propagation-*.js):
       # its physics against figures worked by hand, its ALERT frame against
       # packets.js's own decoder, each of the made-up catchment's stories

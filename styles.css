@@ -31974,3 +31974,15 @@ details.tm-fold summary { cursor: pointer; }
 
 .rscout-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: var(--sp-1) 0; }
 .rscout-table th, .rscout-table td { padding: .15rem .3rem; text-align: left; border-bottom: 1px solid var(--border); }
+
+/* The 🧪 Path test planner on the Pass Ranges tab (alert-test.js). */
+.atp > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); }
+.atp .atp-h { display: inline; margin: 0; font-size: var(--fs-lg, 1.1rem); }
+.atp .atp-controls { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; }
+.atp .atp-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.atp .atp-verdict { border-left: 4px solid var(--border); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-md); background: var(--panel-sub); }
+.atp .atp-verdict p { margin: var(--sp-1) 0; }
+.atp .atp-good { border-left-color: var(--ok); }
+.atp .atp-fair, .atp .atp-unclear { border-left-color: var(--warn); }
+.atp .atp-poor, .atp .atp-none { border-left-color: var(--bad, var(--warn)); }
+.atp .atp-caveat { background: var(--panel-sub); }

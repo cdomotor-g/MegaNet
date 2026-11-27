@@ -127,7 +127,7 @@ if (typeof window !== 'undefined') window.setPassRangeProto = setPassRangeProto;
 
 function renderPassRangesHtml() {
   if (passRangeProto() === 'alert2' && typeof Alert2Ids !== 'undefined') {
-    return `<div class="page as-page">${passRangeProtoHtml('alert2')}${Alert2Ids.pageHtml()}</div>`;
+    return `<div class="page as-page">${passRangeProtoHtml('alert2')}${typeof AlertTest !== 'undefined' ? AlertTest.cardHtml() : ''}${Alert2Ids.pageHtml()}</div>`;
   }
   const all       = state.data.stations;
   const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
@@ -138,6 +138,7 @@ function renderPassRangesHtml() {
   return `
     <div class="page as-page">
       ${passRangeProtoHtml('alert')}
+      ${typeof AlertTest !== 'undefined' ? AlertTest.cardHtml() : ''}
       <div class="panel">
         <div class="panel-header"><h2>ALERT IDs</h2></div>
         <div class="stats stats-row">
