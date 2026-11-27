@@ -24649,6 +24649,38 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .cam-flash.is-on { animation: cam-flash .35s ease-out; }
 @keyframes cam-flash { from { opacity: .85; } to { opacity: 0; } }
 
+/* 🌄 Pano (field-camera.js): the hint and the progress strip over the foot of
+   the picture while a panorama is swept; the shutter becomes a stop square. */
+.cam-pano {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: .75rem;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  pointer-events: none;
+}
+.cam-pano[hidden] { display: none; }
+.cam-pano-hint {
+  margin: 0;
+  padding: .3rem .7rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: auto;
+}
+.cam-pano-hint.is-warn { background: rgba(140, 80, 0, .85); }
+.cam-pano-hint.is-level { background: rgba(170, 30, 30, .9); font-size: 1.1em; }
+.cam-pano-bar { width: 100%; height: 1.4rem; border-radius: 6px; }
+.cam-shutter.is-pano span { border-radius: 22%; transform: scale(.6); background: #e5484d; }
+.cam-words { margin: 0 0 var(--sp-2); }
+.cam-words dl { margin: var(--sp-2) 0 0; }
+.cam-words dt { font-weight: 600; }
+.cam-words dd { margin: 0 0 var(--sp-1) 0; color: var(--muted); }
+
 .cam-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

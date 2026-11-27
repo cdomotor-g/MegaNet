@@ -10,7 +10,7 @@
 // After core.js, photo-meta.js, photo-stamp.js, field-photos.js and
 // station-ar.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, APP_VERSION,
-// registerTabTeardown, bearingDeg, KM_PER_DEG_LAT and kmPerDegLon; to
+// registerTabTeardown, bearingDeg, termHtml, KM_PER_DEG_LAT and kmPerDegLon; to
 // photo-stamp.js for PhotoStamp (the panel and the EXIF); to photo-meta.js for
 // PhotoMeta.read and PhotoMeta.record (the same record every other door
 // sends); to station-ar.js for the World Magnetic Model and the phone's
@@ -101,6 +101,10 @@
 // it is taken: the photo's bytes are kept past its upload, and its line says
 // Save a copy until it is pressed.
 //
+// ── 🌄 Pano ──────────────────────────────────────────────────────────────────
+// A panorama swept by hand, frames grabbed by the compass, joined on one wide
+// canvas and kept like any photo — "Pano" below says how.
+//
 // Issue: the Field Photos epic. Schema: db/migrations/0035_field_photos.sql,
 // 0036_photo_review.sql. The rest: docs/field-photos.md, "Taking photos in
 // Flood-Net".
@@ -142,6 +146,30 @@ const FieldCamera = (function () {
   const SETTINGS_KEY = 'mn-camera';
   const DEFAULT_PROJECT = 'BoM-FWIN';    // what the crews' Solocator photos carry
 
+  // 🌄 Pano: a panorama swept by hand (see "Pano" below).
+  const PANO_STEP = 15;          // a frame each time the camera has turned this far…
+  const PANO_GAP = 28;           // …but not past this, or the strips would not meet
+  const PANO_HALF = 18;          // each frame keeps this much either side of its middle
+  const PANO_FEATHER = 4;        // neighbouring strips fade into each other over this
+  const PANO_ROLL = 6;           // leaning more than this to one side: no frame, "hold level"
+  const PANO_PITCH = 25;         // pointing more than this up or down: no frame, "hold level"
+  const PANO_FAST = 45;          // turning faster than this (° a second) blurs: "slower"
+  const PANO_STRIP_H = 1440;     // a frame is kept this tall
+  const PANO_MAX_W = 8192;       // the panorama's widest
+  const PANO_MAX_FRAMES = 40;
+  const PANO_SEARCH = 4;         // the pictures may move a neighbour this far from where the compass put it
+  const PANO_LOW_PPD = 3;        // …compared at this many pixels a degree
+  const PANO_MATCH = 0.6;        // …and believed when they agree this well (a correlation, 0 to 1)
+
+  // Words on this tab that mean something particular here — on hover, and in
+  // the tab's "What the words on this page mean" fold.
+  const WORDS = {
+    pitch: 'How far the camera points up (+) or down (−) from level, in degrees.',
+    roll: 'How far the phone leans to one side, in degrees. The line on the picture stays level with the ground and turns green within 1°.',
+    pano: `A panorama: one wide photo made by turning slowly on the spot. A frame is taken each time the compass says the camera has turned about ${PANO_STEP}°, and their middles are joined side by side.`,
+    level: `Keep the phone upright and square to the ground while you turn: a frame is only taken while it leans less than ${PANO_ROLL}° and points within ${PANO_PITCH}° of level.`,
+  };
+
   // What a photo is of, a tap each — written into its caption, and on the
   // stamp above the place.
   const CAPTIONS = ['Site overview', 'Logger cabinet', 'Antenna and mast', 'Solar and battery', 'Rain gauge',
@@ -181,6 +209,7 @@ const FieldCamera = (function () {
   let pumping = false, pumpTimer = 0;
   let icons = new Map();         // id → object URL of its icon
   let msg = null;
+  let pano = null;               // a sweep under way (panoStart)
 
   const $ = id => document.getElementById(id);
 
@@ -534,6 +563,8 @@ const FieldCamera = (function () {
   function stopCamera() {
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = null; track = null; torch = false; zoomHw = null;
+    if (pano && pano.phase === 'sweeping') pano = null;
+    paintPano();
     closeMap();
     const v = $('cam-video');
     if (v) { v.srcObject = null; v.hidden = true; v.style.transform = ''; }
@@ -870,7 +901,8 @@ const FieldCamera = (function () {
     const tick = t => {
       raf = 0;
       if (cam !== 'on' || !$('cam-overlay')) return;
-      if (t - lastPaint >= PREVIEW_MS) { lastPaint = t; paintPreview(); }
+      if (pano) panoTick(t);
+      if (t - lastPaint >= PREVIEW_MS) { lastPaint = t; paintPreview(); paintPano(); }
       if (t - lastRead >= 500) { lastRead = t; paintReadout(); updateMap(); }
       if (t - lastCheck >= 1000) { lastCheck = t; checkPicture(); }
       if (cam !== 'on') return;
@@ -889,7 +921,9 @@ const FieldCamera = (function () {
     const ctx = cv.getContext('2d');
     ctx.clearRect(0, 0, w, h);
     if (cam !== 'on') return;
-    PhotoStamp.draw(ctx, w, h, facts(new Date()));
+    // During a sweep the stamp goes on the panorama, not on each frame: the
+    // picture is left clear but for the level.
+    if (!pano) PhotoStamp.draw(ctx, w, h, facts(new Date()));
     drawLevel(ctx, w, h);
   }
 
@@ -1032,6 +1066,8 @@ const FieldCamera = (function () {
   // ── The shutter ────────────────────────────────────────────────────────────
 
   async function shoot() {
+    // During a sweep the shutter ends it.
+    if (pano) { panoFinish(); return; }
     const v = $('cam-video');
     if (shooting || cam !== 'on' || !v || !v.videoWidth) return;
     // A camera the phone has taken back gives a black photo: started again
@@ -1062,6 +1098,352 @@ const FieldCamera = (function () {
     } finally {
       shooting = false;
       paintControls();
+    }
+  }
+
+  // ── Pano ───────────────────────────────────────────────────────────────────
+  // A panorama, swept by hand. 🌄 starts it and the phone is turned slowly on
+  // the spot. Each time the camera has turned PANO_STEP° the picture is
+  // grabbed, turned level by the phone's roll, and its middle kept (a JPEG,
+  // so forty of them fit in a phone's memory). The shutter, or a full circle,
+  // ends it: the kept middles are laid side by side on one wide canvas by
+  // their headings — on a cylinder, at the field of view a phone's camera has
+  // (VIEW_HALF, 66° across its long side) — moved a little where two
+  // neighbours' pictures agree better than the compass on where they meet
+  // (the compass lags and drifts; the pictures do not), the whole chain then
+  // held to the compass end to end, faded into each other over PANO_FEATHER°,
+  // and kept by keepShot like any other photo, stamp and all.
+  //
+  // How far the phone has turned is read from its attitude (headingOf), not
+  // from true north: an iPhone's gyro turns smoothly where its compass jumps,
+  // and a compass with no north in it still knows how far it has turned. True
+  // north, where there is one, is added once, for the stamp.
+
+  function sweepAngle() { return vec && typeof StationAR !== 'undefined' ? StationAR.headingOf(vec) : null; }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+  // The frame's shape as it is kept: scaled to PANO_STRIP_H tall, its focal
+  // length in those pixels (from the long side's 66°, and the camera's own
+  // zoom where it has one), and how much either side of its middle is kept.
+  function panoGeom(vw, vh, zf) {
+    const s = Math.min(1, PANO_STRIP_H / vh);
+    const f = (Math.max(vw, vh) * s / 2) / Math.tan(VIEW_HALF * RAD) * (zf || 1);
+    const hfovHalf = Math.atan((vw * s / 2) / f) / RAD;
+    const half = Math.min(PANO_HALF, hfovHalf * 0.92);
+    return { vw, vh, s, f, hfovHalf, half, w: Math.ceil(2 * f * Math.tan(half * RAD)), h: Math.round(vh * s),
+             gap: Math.min(PANO_GAP, 2 * half - PANO_FEATHER - 2) };
+  }
+
+  function panoStart() {
+    if (pano) { panoCancel(); return; }
+    if (cam !== 'on' || shooting) return;
+    if (!known(sweepAngle())) {
+      say('Pano needs the compass to tell how far the phone has turned, and this browser gives none yet — on a computer there is usually none.', 'warn');
+      return;
+    }
+    // The field of view is known at the camera's widest; a digital zoom would only crop the view.
+    if (zoom > zoomBounds().min + 0.01) setZoom(zoomBounds().min);
+    pano = { phase: 'sweeping', frames: [], dir: 0, cum: 0, last: null, at: 0, speed: 0,
+             raw0: null, a0: 0, trueOff: null, hint: '', grabbing: false, geom: null };
+    paintControls();
+    paintPano();
+    paintPreview();
+    say('Pano: hold the phone upright and level, and turn slowly on the spot. Press the shutter to finish.', 'info');
+    announce('Panorama started. Turn slowly on the spot, holding the phone level; press the shutter to finish.');
+  }
+  function panoCancel(why) {
+    if (!pano || pano.phase === 'stitching') return;
+    pano = null;
+    paintControls();
+    paintPano();
+    say(why || 'Panorama cancelled — nothing kept.', why ? 'warn' : 'info');
+  }
+
+  // Every frame of the preview's loop, while a sweep is under way: how far the
+  // phone has turned, how fast, whether it is level, and a frame when it has
+  // turned far enough — and no further than the strips can still meet.
+  function panoTick(now) {
+    const p = pano;
+    if (!p || p.phase !== 'sweeping') return;
+    const raw = sweepAngle();
+    if (!known(raw)) { p.hint = 'compass'; return; }
+    if (p.last !== null) {
+      const d = ((raw - p.last + 540) % 360) - 180;
+      p.cum += d;
+      const dt = Math.max(16, now - p.at) / 1000;
+      p.speed += 0.3 * (Math.abs(d) / dt - p.speed);
+    }
+    p.last = raw;
+    p.at = now;
+    const t = headingNow();
+    if (known(t)) p.trueOff = t - raw;
+    const pitch = pitchNow(), roll = rollNow();
+    const level = known(pitch) && known(roll) && Math.abs(roll) <= PANO_ROLL && Math.abs(pitch) <= PANO_PITCH;
+    let hint = level ? '' : 'level';
+    const n = p.frames.length;
+    if (!n) {
+      if (level && !p.grabbing) panoGrab(p, raw, pitch, roll);
+    } else {
+      if (!p.dir && Math.abs(p.cum - p.a0) >= 5) p.dir = Math.sign(p.cum - p.a0);
+      const ahead = p.dir ? (p.cum - p.frames[n - 1].a) * p.dir : 0;
+      if (p.geom && ahead > p.geom.gap) hint = 'back';
+      if (level && !p.grabbing && p.dir && p.geom && ahead >= PANO_STEP && ahead <= p.geom.gap) panoGrab(p, raw, pitch, roll);
+    }
+    if (!hint && p.speed > PANO_FAST && n) hint = 'fast';
+    p.hint = hint;
+  }
+
+  function panoGrab(p, raw, pitch, roll) {
+    const v = $('cam-video');
+    if (!v || !v.videoWidth || !v.videoHeight) return;
+    if (p.geom && (p.geom.vw !== v.videoWidth || p.geom.vh !== v.videoHeight)) {
+      panoCancel('The picture changed shape (the phone turned on its side?) — the panorama was stopped. Press 🌄 to start again.');
+      return;
+    }
+    if (!p.geom) p.geom = panoGeom(v.videoWidth, v.videoHeight, zoomHw ? zoom : 1);
+    const g = p.geom;
+    const cv = document.createElement('canvas');
+    cv.width = g.w; cv.height = g.h;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#000';
+    cx.fillRect(0, 0, g.w, g.h);
+    // Levelled: turned back by the phone's roll about the middle of the picture.
+    cx.translate(g.w / 2, g.h / 2);
+    cx.rotate(-roll * RAD);
+    cx.scale(g.s, g.s);
+    cx.drawImage(v, -v.videoWidth / 2, -v.videoHeight / 2);
+    if (!p.frames.length) {
+      p.raw0 = raw; p.a0 = p.cum;
+      p.when = new Date();
+      p.facts = facts(p.when);
+    }
+    const frame = { a: p.cum, pitch, roll, cv, blob: null };
+    p.frames.push(frame);
+    p.grabbing = true;
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* no buzz */ }
+    cv.toBlob(b => {
+      if (b) { frame.blob = b; frame.cv = null; }
+      p.grabbing = false;
+    }, 'image/jpeg', 0.9);
+    // A full circle, or as many frames as are kept: finished by itself.
+    const turned = Math.abs(frame.a - p.a0);
+    if (turned + 2 * g.half >= 360 + PANO_FEATHER || p.frames.length >= PANO_MAX_FRAMES) setTimeout(panoFinish, 0);
+  }
+
+  async function panoFinish() {
+    const p = pano;
+    if (!p || p.phase !== 'sweeping') return;
+    if (p.frames.length < 2) {
+      say('Turn a little further first — a panorama needs at least two frames.', 'warn');
+      return;
+    }
+    p.phase = 'stitching';
+    shooting = true;
+    paintControls();
+    paintPano();
+    say('Joining the panorama…', 'info');
+    try {
+      const out = await panoStitch(p);
+      const f = Object.assign({}, p.facts, { heading: out.heading, headingRef: 'T', pitch: out.pitch, roll: 0 });
+      flash();
+      await keepShot(out.cv, f, { source: 'camera-pano', pano: out.meta });
+    } catch (err) {
+      say(`The panorama could not be made — ${(err && err.message) || err}.`, 'error');
+    } finally {
+      if (pano === p) pano = null;
+      shooting = false;
+      paintControls();
+      paintPano();
+    }
+  }
+
+  // Columns x0…x1 of `ctx` from one kept frame, column x looking theta(x)°
+  // off the frame's middle: the frame's column at that angle (f·tan θ from
+  // its middle), squeezed by cos θ — a flat picture laid onto a cylinder.
+  function panoWarp(ctx, src, g, x0, x1, ppd, theta, top, alpha) {
+    const sc = ppd / (g.f * RAD), hh = g.h * sc, cxs = g.w / 2, half = 0.5 / ppd;
+    for (let x = x0; x < x1; x++) {
+      const t = theta(x + 0.5);
+      const xs0 = cxs + g.f * Math.tan((t - half) * RAD), xs1 = cxs + g.f * Math.tan((t + half) * RAD);
+      if (xs0 < 0 || xs1 > g.w) continue;
+      const al = alpha ? alpha(x + 0.5) : 1;
+      if (al <= 0) continue;
+      const c = Math.cos(t * RAD);
+      ctx.globalAlpha = al;
+      ctx.drawImage(src, xs0, 0, Math.max(0.25, xs1 - xs0), g.h, x, top + hh * (1 - c) / 2, 1, hh * c);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // A frame small and grey, on the cylinder at PANO_LOW_PPD pixels a degree:
+  // what two neighbours are compared on.
+  function panoLow(src, g) {
+    const sc = PANO_LOW_PPD / (g.f * RAD);
+    const w = Math.max(8, Math.round(2 * g.half * PANO_LOW_PPD)), h = Math.max(8, Math.round(g.h * sc));
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    panoWarp(cx, src, g, 0, w, PANO_LOW_PPD, x => x / PANO_LOW_PPD - g.half, 0, null);
+    const d = cx.getImageData(0, 0, w, h).data;
+    const grey = new Float32Array(w * h);
+    for (let i = 0; i < grey.length; i++) grey[i] = 0.299 * d[4 * i] + 0.587 * d[4 * i + 1] + 0.114 * d[4 * i + 2];
+    return { w, h, grey, sc };
+  }
+
+  // Where frame B sits from frame A, by their pictures: B is d° on from A by
+  // the compass and dyPred low pixels lower by the tilt; every shift within
+  // PANO_SEARCH° and three pixels of that is tried, and the best kept if the
+  // two agree well (a correlation of PANO_MATCH or better) and it is not at
+  // the edge of the search (which would mean the answer lies beyond it).
+  // Null where the pictures cannot say: sky, fog, a blank wall.
+  function panoMatch(A, B, d, dyPred) {
+    const ppd = PANO_LOW_PPD, S = Math.round(PANO_SEARCH * ppd), base = Math.round(d * ppd), dy0 = Math.round(dyPred || 0);
+    let best = null;
+    for (let i = -S; i <= S; i++) {
+      const off = base + i;
+      const xa0 = Math.max(0, off), xa1 = Math.min(A.w, B.w + off);
+      if (xa1 - xa0 < 8) continue;
+      for (let dy = dy0 - 3; dy <= dy0 + 3; dy++) {
+        const ya0 = Math.max(Math.round(A.h * 0.2), Math.round(B.h * 0.2) + dy);
+        const ya1 = Math.min(Math.round(A.h * 0.8), Math.round(B.h * 0.8) + dy);
+        if (ya1 - ya0 < 8) continue;
+        let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+        for (let y = ya0; y < ya1; y += 2) {
+          const ra = y * A.w, rb = (y - dy) * B.w - off;
+          for (let x = xa0; x < xa1; x += 2) {
+            const va = A.grey[ra + x], vb = B.grey[rb + x];
+            n++; sa += va; sb += vb; saa += va * va; sbb += vb * vb; sab += va * vb;
+          }
+        }
+        const vA = saa - sa * sa / n, vB = sbb - sb * sb / n;
+        if (vA <= n || vB <= n) continue;     // flat: nothing to match on
+        const r = (sab - sa * sb / n) / Math.sqrt(vA * vB);
+        if (!best || r > best.r) best = { r, i, dy };
+      }
+    }
+    if (!best || best.r < PANO_MATCH || Math.abs(best.i) === S) return null;
+    return { d: (base + best.i) / ppd, dy: best.dy, r: best.r };
+  }
+
+  async function panoStitch(p) {
+    const g = p.geom;
+    const fr = p.frames.slice().sort((x, y) => x.a - y.a);
+    const srcs = [];
+    for (const x of fr) srcs.push(x.cv || await createImageBitmap(x.blob));
+    const n = fr.length - 1;
+    // By the compass and the tilt: each frame's place across (degrees from
+    // the first) and its top (pixels, so that every frame's horizon meets).
+    const a = fr.map(x => x.a - fr[0].a);
+    const tilt = fr.map(x => -g.f * Math.tan((x.pitch || 0) * RAD));
+    // By the pictures, neighbour to neighbour…
+    const low = srcs.map(s => panoLow(s, g));
+    const pos = [0], top = [tilt[0]];
+    let matched = 0;
+    for (let k = 1; k <= n; k++) {
+      const m = panoMatch(low[k - 1], low[k], a[k] - a[k - 1], (tilt[k] - tilt[k - 1]) * low[k].sc);
+      if (m) matched++;
+      pos.push(pos[k - 1] + (m ? m.d : a[k] - a[k - 1]));
+      top.push(top[k - 1] + (m ? m.dy / low[k].sc : tilt[k] - tilt[k - 1]));
+    }
+    // …then held to the compass and the tilt end to end, the difference
+    // shared along the chain — or the compass alone, where the two disagree
+    // by more than a quarter of the turn.
+    const errX = pos[n] - a[n], errY = top[n] - tilt[n];
+    const aligned = matched > 0 && Math.abs(errX) <= Math.max(2, 0.25 * a[n]);
+    for (let k = 0; k <= n; k++) {
+      const w = a[n] ? a[k] / a[n] : 0;
+      pos[k] = aligned ? pos[k] - errX * w : a[k];
+      top[k] = aligned ? top[k] - errY * w : tilt[k];
+    }
+    // The canvas: the turn (a full circle at most), at the frames' own scale
+    // or less, and the band of height every frame fills.
+    const start = pos[0] - g.half, end = Math.min(pos[n] + g.half, start + 360);
+    const ppd = Math.min(g.f * RAD, PANO_MAX_W / (end - start));
+    const sc = ppd / (g.f * RAD);
+    const c = Math.cos(g.half * RAD);
+    let lo = -Infinity, hi = Infinity;
+    fr.forEach((x, k) => {
+      const m = (g.w / 2) * Math.abs(Math.sin((x.roll || 0) * RAD));   // the corners levelling turned in
+      lo = Math.max(lo, top[k] + g.h * (1 - c) / 2 + m);
+      hi = Math.min(hi, top[k] + g.h * (1 + c) / 2 - m);
+    });
+    if (hi - lo < 0.25 * g.h) throw new Error('the phone tipped up and down too far while turning — hold it level and try again');
+    const W = Math.max(1, Math.round((end - start) * ppd)), H = Math.max(1, Math.round((hi - lo) * sc));
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingQuality = 'high';
+    fr.forEach((x, k) => {
+      const seamIn = k ? (pos[k - 1] + pos[k]) / 2 - PANO_FEATHER / 2 : null;
+      const L = k ? Math.max(seamIn, pos[k] - g.half) : start;
+      const R = k < n ? Math.min((pos[k] + pos[k + 1]) / 2 + PANO_FEATHER / 2, pos[k] + g.half) : pos[k] + g.half;
+      const x0 = Math.max(0, Math.floor((L - start) * ppd)), x1 = Math.min(W, Math.ceil((R - start) * ppd));
+      panoWarp(ctx, srcs[k], g, x0, x1, ppd, X => X / ppd + start - pos[k], (top[k] - lo) * sc,
+        k ? X => clamp((X / ppd + start - seamIn) / PANO_FEATHER, 0, 1) : null);
+    });
+    srcs.forEach(s => { try { if (s.close) s.close(); } catch (_) { /* a canvas */ } });
+    const trueAt = ang => (known(p.trueOff) && known(p.raw0) ? Math.round(norm360(p.raw0 + (ang + fr[0].a - p.a0) + p.trueOff) * 10) / 10 : null);
+    const pitches = fr.map(x => x.pitch || 0);
+    return {
+      cv,
+      heading: trueAt((start + end) / 2),
+      pitch: pitches.reduce((s, x) => s + x, 0) / pitches.length,
+      meta: {
+        frames: fr.length, span: Math.round((end - start) * 10) / 10, full: end - start >= 359.5,
+        from: trueAt(start), to: trueAt(end), hfov: Math.round(2 * g.hfovHalf * 10) / 10,
+        matched, pairs: n, aligned, drift: Math.round(errX * 10) / 10,
+      },
+    };
+  }
+
+  // The strip over the picture: the circle the sweep is going round, the
+  // frames taken so far, where the camera points now — and the hint.
+  const PANO_HINTS = {
+    level: 'Hold level — upright, not leaning, not pointing up or down',
+    back: 'Too far without a frame — turn back a little',
+    fast: 'Slower — turning fast blurs the frames',
+    compass: 'Waiting for the compass…',
+  };
+  function paintPano() {
+    const box = $('cam-pano');
+    if (!box) return;
+    box.hidden = !pano;
+    if (!pano) return;
+    const p = pano, g = p.geom, n = p.frames.length;
+    const hint = $('cam-pano-hint');
+    if (hint) {
+      const span = n ? Math.round(Math.abs(p.frames[n - 1].a - p.a0) + 2 * (g ? g.half : PANO_HALF)) : 0;
+      const text = p.phase === 'stitching' ? 'Joining the frames…'
+        : PANO_HINTS[p.hint] || (!n ? 'Hold the phone level to start'
+          : `Turn slowly ${p.dir > 0 ? 'right' : p.dir < 0 ? 'left' : 'right or left'} · ${n} frame${n === 1 ? '' : 's'} · ${Math.min(360, span)}° · shutter to finish`);
+      if (hint.textContent !== text) hint.textContent = text;
+      hint.classList.toggle('is-warn', !!PANO_HINTS[p.hint] && p.phase !== 'stitching');
+      hint.classList.toggle('is-level', p.hint === 'level');
+    }
+    const bar = $('cam-pano-bar');
+    if (!bar) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.round(bar.clientWidth * dpr)), h = Math.max(1, Math.round(bar.clientHeight * dpr));
+    if (bar.width !== w || bar.height !== h) { bar.width = w; bar.height = h; }
+    const ctx = bar.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(0, 0, w, h);
+    const half = g ? g.half : PANO_HALF, dir = p.dir || 1;
+    const X = deg => (deg + half) / 360 * w;
+    ctx.fillStyle = 'rgba(61,220,132,.55)';
+    for (const fr of p.frames) {
+      const at = (fr.a - p.a0) * dir;
+      ctx.fillRect(X(at - half), h * 0.2, Math.max(1, X(at + half) - X(at - half)), h * 0.6);
+    }
+    ctx.fillStyle = '#3ddc84';
+    for (const fr of p.frames) ctx.fillRect(X((fr.a - p.a0) * dir) - dpr, h * 0.12, 2 * dpr, h * 0.76);
+    if (n) {
+      const now = clamp((p.cum - p.a0) * dir, -half, 360 - half);
+      ctx.fillStyle = PANO_HINTS[p.hint] ? '#ffb020' : '#fff';
+      ctx.fillRect(X(now) - 1.5 * dpr, 0, 3 * dpr, h);
     }
   }
 
@@ -1178,7 +1560,8 @@ const FieldCamera = (function () {
     const thumb = await scaled(cv, THUMB_PX, 0.82);
     const icon = await scaled(cv, ICON_PX, 0.75);
     const sha = await sha256(jpeg);
-    const name = PhotoStamp.fileName(f);
+    // A panorama says so in its name: floodnet-<station>-<time>-pano.jpg.
+    const name = from.pano ? PhotoStamp.fileName(f).replace(/\.jpg$/, '-pano.jpg') : PhotoStamp.fileName(f);
     const meta = PhotoMeta.read(jpeg);
     const record = PhotoMeta.record({
       meta, name, size: jpeg.length, type: 'image/jpeg', converted: false, width: W, height: H, caption: f.caption,
@@ -1195,7 +1578,7 @@ const FieldCamera = (function () {
       source: from.source, file: from.file || null,
       gps: gps && f.fixUsed !== false ? { fix_at: new Date(gps.at).toISOString(), age_s: Math.round(fixAge() / 1000),
                    altitude_accuracy_m: known(gps.altAcc) ? Math.round(gps.altAcc) : null } : null,
-      heading: known(f.heading) ? { source: from.source === 'camera' ? compass : 'exif', declination: +decl.toFixed(2),
+      heading: known(f.heading) ? { source: from.source === 'camera' || from.source === 'camera-pano' ? compass : 'exif', declination: +decl.toFixed(2),
                                     compass_accuracy: compassAcc } : null,
       height: f.height ? { source: f.height.source, ref: f.height.ref } : null,
       ground: ground && known(f.lat) && metres(ground.lat, ground.lon, f.lat, f.lon) <= GROUND_M * 4
@@ -1204,6 +1587,7 @@ const FieldCamera = (function () {
       locality: f.locality ? { name: f.locality, source: 'OpenStreetMap' } : null,
       tilt: known(f.pitch) ? { pitch: Math.round(f.pitch * 10) / 10, roll: known(f.roll) ? Math.round(f.roll * 10) / 10 : null } : null,
       zoom: from.zoom && from.zoom > 1.01 ? Math.round(from.zoom * 10) / 10 : null,
+      pano: from.pano || null,
       project: f.project || null,
     };
     // What is on the stamp is what the photo is filed under: the station, or
@@ -1656,14 +2040,24 @@ const FieldCamera = (function () {
       <p class="small cam-lead">Photos taken here carry the stamp Solocator prints — the way the camera faced,
         the position and its ±, the height, the time — and the station they are of. Each is kept on this device,
         then goes into <strong>Field Photos</strong> under that station by itself, as soon as there is a signal.
-        On the picture, <strong>pitch</strong> is how far the camera points up (+) or down (−) and <strong>roll</strong> is how far the phone
+        On the picture, <strong>${termHtml('pitch', WORDS.pitch)}</strong> is how far the camera points up (+) or down (−) and <strong>${termHtml('roll', WORDS.roll)}</strong> is how far the phone
         leans to one side; the line stays level with the ground and turns green within a degree. Pinch or use 1× 2× 3× to zoom, and 🗺️ shows
-        where the phone thinks it is on a map.</p>
+        where the phone thinks it is on a map. 🌄 <strong>${termHtml('Pano', WORDS.pano)}</strong> makes one wide photo: press it, then turn slowly on
+        the spot, <strong>${termHtml('holding level', WORDS.level)}</strong>, and press the shutter to finish (or go all the way round).</p>
+      <details class="cam-words small">
+        <summary>What the words on this page mean</summary>
+        <dl>${[['Pitch', WORDS.pitch], ['Roll', WORDS.roll], ['Pano', WORDS.pano], ['Hold level', WORDS.level]]
+          .map(([t, m]) => `<dt>${esc(t)}</dt><dd>${esc(m)}</dd>`).join('')}</dl>
+      </details>
       <div class="cam-block" id="cam-block">
         <div class="cam-stage" id="cam-stage" data-theme="dark" style="--cam-aspect: 4 / 3">
           <video id="cam-video" class="cam-video" playsinline muted hidden></video>
           <canvas id="cam-overlay" class="cam-overlay" aria-hidden="true"></canvas>
           <div class="cam-map" id="cam-map" hidden></div>
+          <div class="cam-pano" id="cam-pano" hidden>
+            <p class="cam-pano-hint" id="cam-pano-hint" role="status" title="${escAttr(WORDS.level)}"></p>
+            <canvas class="cam-pano-bar" id="cam-pano-bar" aria-hidden="true"></canvas>
+          </div>
           <div class="cam-flash" id="cam-flash" aria-hidden="true"></div>
           <div class="cam-idle" id="cam-idle">${idleHtml()}</div>
         </div>
@@ -1761,12 +2155,16 @@ const FieldCamera = (function () {
             onclick="FieldCamera.setTorch(${!torch})">🔦</button>` : ''}
         ${on && document.fullscreenEnabled ? `<button type="button" class="cam-round" aria-label="Full screen" title="Full screen"
             onclick="FieldCamera.toggleFull()">⛶</button>` : ''}
+        ${on ? `<button type="button" class="cam-round" data-tour="cam-pano" aria-pressed="${!!pano}"
+            aria-label="${pano ? 'Cancel the panorama' : 'Pano — take a panorama'}" title="${escAttr(pano ? 'Cancel the panorama' : `Pano — ${WORDS.pano}`)}"
+            onclick="FieldCamera.pano()" ${pano && pano.phase === 'stitching' ? 'disabled' : ''}>🌄</button>` : ''}
         ${on ? `<button type="button" class="cam-round" aria-pressed="${!!prefs().map}" aria-label="Map: check your position" title="Map — check your position is right"
             onclick="FieldCamera.toggleMap()">🗺️</button>` : ''}
         ${on ? `<button type="button" class="cam-round" aria-label="Stop the camera" title="Stop the camera"
             onclick="FieldCamera.off()">✕</button>` : ''}
       </div>
-      <button type="button" class="cam-shutter" id="cam-shutter" aria-label="Take a photo" title="Take a photo"
+      <button type="button" class="cam-shutter${pano ? ' is-pano' : ''}" id="cam-shutter"
+        aria-label="${pano ? 'Finish the panorama' : 'Take a photo'}" title="${pano ? 'Finish the panorama' : 'Take a photo'}"
         onclick="FieldCamera.shoot()" ${on && !shooting ? '' : 'disabled'}><span aria-hidden="true"></span></button>
       <div class="cam-controls-side cam-controls-end">
         ${last ? `<button type="button" class="cam-last" aria-label="The last photo: ${esc(last.name)}" title="The last photo"
@@ -2007,7 +2405,7 @@ const FieldCamera = (function () {
 
   return {
     render, init, stop, boot, authChanged,
-    start, off, shoot, fromFiles, setTorch, toggleFull, setZoom, toggleMap,
+    start, off, shoot, fromFiles, pano: panoStart, setTorch, toggleFull, setZoom, toggleMap,
     pickStation, pickNone, pickAuto, findStation, setCaption, tapCaption, setPref,
     retry, sendNow, sendUnfiled, removeShot, clearDone, saveCopy, openShot, showList,
     // The arithmetic, for the check — none of it touches the page.
@@ -2021,10 +2419,13 @@ const FieldCamera = (function () {
       locality: locality ? locality.name : null, ground: ground ? { ...ground } : null,
       memOnly, pumping, caption, settings: { ...prefs() },
       frameWatch, revives,
+      pano: pano ? { phase: pano.phase, frames: pano.frames.length, cum: pano.cum, dir: pano.dir, hint: pano.hint } : null,
       shots: shots.map(s => ({ id: s.id, name: s.name, status: s.status, note: s.note, rowId: s.rowId, station: s.station ? s.station.id : null,
                                sha: s.sha, bytes: s.bytes, tries: s.tries, record: s.record, copy: s.copy || null })),
     }),
     _facts: () => facts(new Date()),
+    // The panorama's arithmetic, for the check.
+    _pano: { geom: panoGeom, match: panoMatch },
   };
 })();
 if (typeof window !== 'undefined') window.FieldCamera = FieldCamera;

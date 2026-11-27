@@ -301,7 +301,7 @@ try {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
     geolocation: { latitude: HERE.lat, longitude: HERE.lon, accuracy: 4 },
-    permissions: ['geolocation', 'camera'], timezoneId: 'Australia/Brisbane',
+    permissions: ['geolocation', 'camera', 'accelerometer', 'gyroscope', 'magnetometer'], timezoneId: 'Australia/Brisbane',
   });
   await context.addInitScript(SPIES);
   const page = await context.newPage();
@@ -859,6 +859,80 @@ try {
   d = await dbg(page);
   check('an iPhone\'s compass, its gyro kept on north: magnetic 100° is true 100° plus the declination',
     d.compass === 'ios' && angNear(d.heading, 100 + decl, 1), J({ compass: d.compass, heading: d.heading }));
+
+  // ── Pano ─────────────────────────────────────────────────────────────────
+  section('🌄 Pano: a panorama swept by hand');
+  const geo = await page.evaluate(() => [FieldCamera._pano.geom(3024, 4032, 1), FieldCamera._pano.geom(4032, 3024, 1)]);
+  check('the field of view: 66° across the long side — about 52° across a phone held upright',
+    near(2 * geo[1].hfovHalf, 66, 0.01) && near(2 * geo[0].hfovHalf, 51.9, 0.2) && geo[0].half === 18 && geo[0].gap <= 28,
+    J(geo.map(g => ({ hfov: 2 * g.hfovHalf, half: g.half, gap: g.gap }))));
+  const matched = await page.evaluate(() => {
+    // A made-up scene, and two frames of it 16.5° apart where the compass says 15°.
+    const ppd = 3, half = 18, h = 90, w = 2 * half * ppd;
+    const scene = (deg, y) => 128 + 60 * Math.sin(deg * 0.9 + y * 0.21) + 50 * Math.cos(deg * 0.37 - y * 0.13) + 30 * Math.sin(deg * deg * 0.011 + y);
+    const frame = (mid, dy) => {
+      const grey = new Float32Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) grey[y * w + x] = scene(mid + x / ppd - half, y + dy);
+      return { w, h, grey, sc: 1 };
+    };
+    const flat = { w, h, grey: new Float32Array(w * h).fill(90), sc: 1 };
+    return { moved: FieldCamera._pano.match(frame(0, 0), frame(16.5, 2), 15, 0), sky: FieldCamera._pano.match(flat, flat, 15, 0) };
+  });
+  check('neighbours placed by their pictures where the compass is out: 16.5° apart, not the compass\'s 15°, and 2 px lower',
+    matched.moved && near(matched.moved.d, 16.5, 0.34) && matched.moved.dy === 2 && matched.moved.r > 0.9, J(matched.moved));
+  check('…and by the compass alone where the pictures say nothing (a clear sky)', matched.sky === null, J(matched.sky));
+
+  // The phone upright and rolled r° to one side, facing trueHeading.
+  const rolled = (pg, trueHeading, dec, r) => pg.evaluate(([alpha, beta]) => {
+    for (let i = 0; i < 40; i++) {
+      window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha, beta, gamma: 90, absolute: true }));
+    }
+  }, [((270 - (trueHeading - dec)) % 360 + 360) % 360, 90 - r]);
+  await android(page, 100, decl);
+  await page.waitForTimeout(300);
+  const panoBefore = (await dbg(page)).shots.length;
+  await page.evaluate(() => FieldCamera.pano());
+  await page.waitForFunction(() => FieldCamera._debug().pano && FieldCamera._debug().pano.frames === 1, null, { timeout: 5_000 });
+  await page.waitForFunction(() => /frame/.test(document.getElementById('cam-pano-hint').textContent), null, { timeout: 2_000 }).catch(() => {});
+  check('🌄 starts it: the first frame as soon as the phone is level, the hint and the strip on the picture',
+    !(await page.$eval('#cam-pano', el => el.hidden)) && /Turn slowly|frame/.test(await text(page, '#cam-pano-hint'))
+      && (await page.$eval('#cam-shutter', el => el.getAttribute('aria-label'))) === 'Finish the panorama',
+    J({ hidden: await page.$eval('#cam-pano', el => el.hidden), hint: await text(page, '#cam-pano-hint'),
+        shutter: await page.$eval('#cam-shutter', el => el.getAttribute('aria-label')) }));
+  for (const h of [116, 132]) {
+    await android(page, h, decl);
+    await page.waitForFunction(n => FieldCamera._debug().pano.frames === n, (h - 100) / 16 + 1, { timeout: 5_000 }).catch(() => {});
+    await page.waitForTimeout(150);
+  }
+  d = await dbg(page);
+  check('a frame each time the compass has turned 15° or more, turning right', d.pano.frames === 3 && d.pano.dir === 1, J(d.pano));
+  await rolled(page, 150, decl, 20);
+  await page.waitForTimeout(500);
+  d = await dbg(page);
+  check('leaning 20° to one side: no frame, and "Hold level" on the picture', d.pano.frames === 3 && d.pano.hint === 'level'
+    && /Hold level/.test(await text(page, '#cam-pano-hint')), J(d.pano));
+  await android(page, 148, decl);
+  await page.waitForFunction(() => FieldCamera._debug().pano.frames === 4, null, { timeout: 5_000 }).catch(() => {});
+  await page.waitForTimeout(200);
+  check('…level again: the frame is taken', (await dbg(page)).pano.frames === 4);
+  await page.tap('#cam-shutter');
+  await page.waitForFunction(n => FieldCamera._debug().shots.length === n + 1 && !FieldCamera._debug().pano, panoBefore, { timeout: 30_000 });
+  d = await dbg(page);
+  const pShot = d.shots[0], pr = pShot.record, pm = pr.meta.capture.pano;
+  check('the shutter joins them into one wide photo, kept like any other', pr.meta.capture.source === 'camera-pano'
+    && pr.width > 1.6 * pr.height && /^floodnet-.*-pano\.jpg$/.test(pShot.name), J({ name: pShot.name, w: pr.width, h: pr.height }));
+  check('its record: the frames, the turn they cover (48° between the first and last, plus a frame\'s width), and how they were placed',
+    pm && pm.frames === 4 && near(pm.span, 48 + 36, 1.5) && pm.pairs === 3 && typeof pm.aligned === 'boolean'
+      && angNear(pm.from, 82, 1.5) && angNear(pm.to, 166, 1.5), J(pm));
+  check('the stamp\'s heading is the middle of the panorama, true north', angNear(pr.heading_deg, 124, 1.5) && pr.heading_ref === 'T',
+    String(pr.heading_deg));
+  await page.evaluate(() => FieldCamera.pano());
+  await page.waitForFunction(() => FieldCamera._debug().pano, null, { timeout: 5_000 });
+  await page.evaluate(() => FieldCamera.pano());
+  d = await dbg(page);
+  check('🌄 again during a sweep cancels it, keeping nothing', !d.pano && d.shots.length === panoBefore + 1
+    && (await page.$eval('#cam-pano', el => el.hidden)));
+
   await page.evaluate(() => FieldCamera.off());
   await page.evaluate(() => switchTab('photos'));
   await page.evaluate(() => switchTab('camera'));

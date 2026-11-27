@@ -272,6 +272,28 @@ it was just taken; one from the gallery more than ten minutes old is stamped
 with no position rather than with where the phone is now, and the phone's town
 and height are left off a photo whose own GPS puts it elsewhere.
 
+### 🌄 Pano — a panorama swept by hand
+
+**🌄** starts a panorama: hold the phone upright and level and turn slowly on
+the spot. Each time the compass says the camera has turned about 15°, the
+picture is grabbed, turned level by the phone's roll, and the middle of it
+kept. No frame is taken while the phone leans more than 6° or points more than
+25° up or down — the picture says **Hold level** — or once it has turned too
+far past the last frame for the two to meet (*turn back a little*). A strip
+over the foot of the picture shows the circle, the frames taken so far and
+where the camera points now. The shutter finishes it; going all the way round
+finishes it by itself.
+
+The frames are laid side by side on one wide canvas by their headings, on a
+cylinder at the field of view a phone's camera has (66° across its long side).
+Where two neighbours' pictures agree well on where they meet, that wins over
+the compass, which lags and drifts; the chain is then held to the compass end
+to end, and each strip fades into the next over 4°. The panorama is stamped
+with the middle's heading, named `floodnet-<station>-<time>-pano.jpg`, and kept
+and sent like any other photo. Its record says how it was made
+(`meta.capture.pano`: the frames, the turn covered, its first and last true
+headings, how many neighbours the pictures placed, and the drift taken out).
+
 ### What it needs
 
 The browser's permission for the **camera** and for **location** (and on an
