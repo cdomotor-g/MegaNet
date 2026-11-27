@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-27** (revision 262 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-27** (revision 263 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -898,6 +898,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 263 — 2026-11-27: ➕ + Propose and + New on the picked station's header — a #299 follow-up
+
+No issue: the owner's Q1 on #299 (*put + New / + Propose on the station header?* — yes).
+
+- The list's two buttons fold away with the list, so beside the map a picked station had no way to add the one next to it. They are now on the side panel's station header, left of Edit: **+ Propose** and **+ New**. A press puts the station down (the list and the blank form come back in its place, focus in the name) — `stnCardAdd`, `app.js`. A form holding something not saved is never thrown away: the press says so and brings the form up instead. Shut panel, phone and tablet are as before — the list's pair is there.
+- **🎬** `station-card`, `station-card-data` and `station-card-lower` retaken (the header shows the two buttons). The words are unchanged.
+- **Checks:** `stncard` (two new checks: the buttons, + Propose, and + New with a draft kept), `explainers`, `dock`, `proposed`, `stationscard` green; the cheap set green.
 
 ### Revision 262 — 2026-11-27: 📍 One station, one place — #299 closed
 
