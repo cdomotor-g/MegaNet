@@ -143,7 +143,8 @@ try {
 
   // ── 1. the rows ──────────────────────────────────────────────────────────
   console.log('\nThe rows — one line each, one load for the station\n');
-  await page.evaluate(id => { window.__sspk.queries.length = 0; selectStation(id); }, STATION);
+  // Beside the map the form is behind the station's Edit (#299, cc78531).
+  await page.evaluate(id => { window.__sspk.queries.length = 0; selectStation(id); if (state.selectedId === id) editStationFromCard(id); }, STATION);
   await page.waitForFunction(() => {
     const b = [...document.querySelectorAll('#ef-sensors .sensor-spark')];
     return b.length && b.every(x => !x.querySelector('.sspk-wait'));
@@ -253,7 +254,7 @@ try {
   ok('a new row with no address has its slot, disabled, saying why', added.disabled && /no address/.test(added.label), added.label);
 
   // Back to the record as stored.
-  await page.evaluate(id => { selectStation(id); selectStation(id); }, STATION);
+  await page.evaluate(id => { selectStation(id); selectStation(id); if (state.selectedId === id && !state.stnCard.editing) editStationFromCard(id); }, STATION);
   await page.waitForFunction(() => document.querySelectorAll('#ef-sensors .sensor-spark path.sspk-line').length === 3,
     null, { timeout: 10000 });
 

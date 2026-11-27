@@ -9304,9 +9304,9 @@ function selectStation(id) {
 // and closing the card returns to that row. `opener` is that row, handed down
 // by selectStation because the table repaint has already replaced it by the
 // time this runs.
-function focusStationOnMap(s, opener = document.activeElement) {
+function focusStationOnMap(s, opener = document.activeElement, { keepPane = false } = {}) {
   if (!state.map) return;
-  showStationCard(s.id, { opener });
+  showStationCard(s.id, { opener, keepPane });
   if (s.lat == null || s.lon == null) return;
   const zoom = Math.max(state.map.getZoom() || 0, MAP_STATION_ZOOM);
   state.map.setView(MapLeader.centreFor(L.latLng(s.lat, s.lon), zoom), zoom);
@@ -9589,8 +9589,10 @@ function elvisCardAsk(elId, s) {
 }
 
 // `select: false` shows the station without the editor following it — a
-// link, and Back and Forward through them (route.js).
-function showStationCard(id, { takeFocus = false, opener = document.activeElement, select = true } = {}) {
+// link, and Back and Forward through them (route.js). `keepPane: true` is a
+// station pressed in a tool's own pane, which goes on to show it there
+// (⏱️ Latency): the side panel stays on that tool.
+function showStationCard(id, { takeFocus = false, opener = document.activeElement, select = true, keepPane = false } = {}) {
   const s = state.data && state.data.stations.find(x => x.id === id);
   if (!s) return;
   // Recorded BEFORE the cross-closes: closing a focused sibling first would
@@ -9609,8 +9611,9 @@ function showStationCard(id, { takeFocus = false, opener = document.activeElemen
   // press away. Not over the digital twin, whose pane is the twin's own
   // controls beside it (and whose station follows the card anyway). A link or
   // Back (select: false) changes no pane, and a shut panel stays shut: the
-  // card is on the map then.
-  if (select && stnCardDocked()) {
+  // card is on the map then. Nor when the station was pressed in a tool's own
+  // pane that shows it next (keepPane): that would hide what was asked for.
+  if (select && !keepPane && stnCardDocked()) {
     const on = dockShowing();
     if (on && on !== 'stations' && !(on === 'twin' && dockToolLive('twin'))) setDockTab('stations', { instant: true });
   }

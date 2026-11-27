@@ -151,6 +151,8 @@ ok('Add the map selection takes the repeater in it and leaves the field station 
 ok('with two in, Compare is on', two.run === false, J(two));
 if (world.third) {
   await page.evaluate(id => { state.mapSelection = new Set(); selectStation(id); }, world.third.id);
+  // The pick brings the station up on 📍 Stations (#299, cc78531); the tool is a press away.
+  await pressDock(page, 'map-repcompare');
   await page.locator('.repcmp-panel button', { hasText: 'Add the selected repeater' }).click();
   const three = await page.evaluate(() => MapRepCompare.repeaters());
   ok('Add the selected repeater takes the station selected', J(three) === J([world.a.id, world.b.id, world.third.id]), J(three));

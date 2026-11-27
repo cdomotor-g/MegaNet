@@ -572,7 +572,10 @@ try {
   check('…its checks slot by slot, the misses drawn and named, the picture saying the counts',
     one.slots > 40 && one.misses > 0 && /missed/.test(one.stripName) && /Missed while a receiver/.test(one.missed), J(one));
   check('…its delay dot by dot, and the receiver that carried it', one.dots && one.rx.some(r => /demo-pi-sdr1/.test(r)), J(one.rx));
+  // A pick elsewhere brings the station up on 📍 Stations (#299, cc78531);
+  // Latency's pane is a press away, and follows it there.
   await page.evaluate(id => showStationCard(id), R.steady);
+  await pressDock(page, 'map-latency');
   await page.waitForTimeout(150);
   const followed = await page.evaluate(() => (document.querySelector('#map-latency-panel #lat-h-stn') || {}).textContent);
   const steadyName = await page.evaluate(id => state.data.stations.find(s => s.id === id).name, R.steady);

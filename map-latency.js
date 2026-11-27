@@ -2101,13 +2101,14 @@ const MapLatency = (() => {
     paint();
   }
 
-  // A station pressed in the pane: on the map with its card, and here.
+  // A station pressed in the pane: on the map with its card, and here — so
+  // the side panel stays on this pane (keepPane), not on 📍 Stations (#299).
   function focus(id) {
     const s = stationById(id);
     if (!s) return;
     U.sel = id;
     U.lastCard = id;
-    if (typeof focusStationOnMap === 'function' && state.map) focusStationOnMap(s, document.activeElement);
+    if (typeof focusStationOnMap === 'function' && state.map) focusStationOnMap(s, document.activeElement, { keepPane: true });
     paint();
     const h = document.getElementById('lat-h-stn');
     if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
