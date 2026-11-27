@@ -134,6 +134,7 @@
     <li><a href="#http">From a script</a></li>
     <li><a href="#limits">Limits and fair use</a></li>
     <li><a href="#notify">Changes, and an email when it changes</a></li>
+    <li><a href="#upload">Sending field photos in</a></li>
     <li><a href="#not">What it does not do</a></li>
     <li><a href="#caveats">Reading the data correctly</a></li>
   </ul>
@@ -592,12 +593,66 @@ curl -s -H 'X-FloodNet-Client: your-name' \
     <code>noreply@floodwarning.net</code> and is used for nothing else.
   </p>
 
+  <h2 id="upload">Sending field photos in</h2>
+  <p>
+    Everything above only reads. Sending photos <em>in</em> is a separate
+    route, <code>https://floodwarning.net/api/upload/v1</code>, kept apart from
+    the read-only API and with a key of its own. It is for other apps and
+    contractors who photograph the stations — gauge boards, loggers, antennas,
+    the site — and want the photos in Flood-Net's Field Photos without anybody
+    dragging files onto a page.
+  </p>
+  <div class="scroll">
+    <table class="glance">
+      <tr><th>Send a photo</th><td><code>PUT https://floodwarning.net/api/upload/v1/photos</code></td></tr>
+      <tr><th>What became of it</th><td><code>GET https://floodwarning.net/api/upload/v1/photos/{receipt}</code></td></tr>
+      <tr><th>Check your key</th><td><code>GET https://floodwarning.net/api/upload/v1/whoami</code></td></tr>
+      <tr><th>Key</th><td><code>Authorization: Bearer fnp_…</code> — one per contractor or app, from a Flood-Net administrator</td></tr>
+      <tr><th>Photos</th><td>JPEG, PNG, WebP or HEIC, up to 24 MB each</td></tr>
+      <tr><th>Limits</th><td>30 uploads a minute per key · each key's daily allowance (500 photos in any 24 hours unless set otherwise)</td></tr>
+    </table>
+  </div>
+  <p>
+    The body is the photo's bytes as they are. Send its SHA-256 (its
+    fingerprint, 64 hex digits) in <code>X-Content-SHA256</code>: it is how
+    the photo is checked on arrival, and how a repeat is recognised — the same
+    photo sent again with the same key gets the same receipt and is not stored
+    twice, so when you are not sure a send arrived, send it again.
+  </p>
+  <pre><code>f=IMG_0042.jpg
+curl -sS -X PUT 'https://floodwarning.net/api/upload/v1/photos?caption=Gauge%20board' \
+  -H "Authorization: Bearer $FLOODNET_UPLOAD_KEY" \
+  -H 'Content-Type: image/jpeg' \
+  -H "X-Content-SHA256: $(sha256sum "$f" | cut -d' ' -f1)" \
+  -H "X-FloodNet-File-Name: $f" \
+  --data-binary @"$f"</code></pre>
+  <p>
+    The answer is a <strong>receipt</strong> at once (<code>202</code>,
+    <code>"state": "waiting"</code>). Within about fifteen minutes the photo is
+    read the way every field photo is — the position, time and heading its
+    camera recorded — and filed in Field Photos under the nearest station;
+    its receipt then says <code>imported</code>, <code>unplaced</code> (nothing
+    said where it was taken), <code>duplicate</code> (already in Flood-Net) or
+    <code>refused</code>, with the reason. You can also send
+    <code>station</code>, <code>caption</code>, <code>lat</code> and
+    <code>lon</code>, and <code>taken_at</code> (with its time zone) in the
+    query string; a position or time is used only when the photo itself has
+    none.
+  </p>
+  <p>
+    Keep the key secret — anyone holding it can send photos as you — and out
+    of code, URLs and logs. Every parameter, every answer and two ready-made
+    senders (Node and Python) are in the
+    <a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#sending-field-photos">full reference</a>.
+  </p>
+
   <h2 id="not">What it does not do</h2>
   <ul>
     <li>
       <strong>It is read-only.</strong> There is no way to change anything
       through it — every request upstream is a read with the public key, the
-      same as a visitor to the app who has not signed in.
+      same as a visitor to the app who has not signed in. Sending field
+      photos in is <a href="#upload">a separate route</a>, with a key.
     </li>
     <li>
       <strong>It serves public data only.</strong> Not inspection remarks or who

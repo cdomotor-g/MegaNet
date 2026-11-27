@@ -104,6 +104,13 @@
 // which sends no CORS header: public, read-only, one fixed call, only a list of
 // gauge numbers from the caller. worker/qld-gauges.js.
 //
+// A sixteenth: /api/upload/v1/*, field photos sent in by other apps and
+// contractors, each with a key of its own minted on the Admin tab — a write
+// route, outside the read-only agent API and sharing nothing with it. It
+// stores the bytes in an inbox in the PHOTOS bucket and the field photo sync
+// files them (PHOTO_SOURCE=api). worker/upload.js, db/migrations/0127,
+// docs/agent-api.md ("Sending field photos").
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql — and every
@@ -123,6 +130,7 @@ import { isSortPath, handleSort } from './sort.js';
 import { isCanopyPath, handleCanopy } from './canopy.js';
 import { isGroundPath, handleGround } from './ground.js';
 import { isQldGaugesPath, handleQldGauges } from './qld-gauges.js';
+import { isUploadPath, handleUpload } from './upload.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -634,6 +642,10 @@ export default {
     // The State's live river heights (worker/qld-gauges.js): anybody, gauge
     // numbers only, one fixed call to the State's portal, kept in the edge cache.
     if (isQldGaugesPath(url.pathname)) return handleQldGauges(request, env, ctx);
+
+    // Field photos from other apps and contractors (worker/upload.js): a
+    // photo upload key each, a write route of its own — never worker/api.js.
+    if (isUploadPath(url.pathname)) return handleUpload(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

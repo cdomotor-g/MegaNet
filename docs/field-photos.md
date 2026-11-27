@@ -135,6 +135,26 @@ workflow, the same run, the same `photo-meta.js`. *Linking a Google Drive
 folder* below is the setup. In either folder a **zip of photos** is opened and
 each photo in it filed as one of its own (*Zip packs in a linked folder*).
 
+### Sent in by other apps and contractors
+
+Another app — a contractor's field app, a camera that uploads by itself — can
+send photos straight in over the **photo upload API**
+(`PUT https://floodwarning.net/api/upload/v1/photos`), each sender with a
+**photo upload key** an administrator makes on the Admin tab (Ingest tokens →
+*Photo upload keys*: a label, a daily allowance, an optional end date; shown
+once, kept only as a hash). The Worker (`worker/upload.js`) checks the key,
+the type, the size and the SHA-256 the sender declared, keeps the bytes
+untouched in an inbox in R2 and answers with a receipt; a third scheduled
+workflow (`field-photos-api.yml`, `PHOTO_SOURCE=api`) reads them with the
+**same** `photo-meta.js` and files them as any other — origin `api`,
+`uploaded_by` `api:<the key's label>`, each in the Review panel's log. A
+station, caption, position or time the sender gave is used where the photo
+says nothing (placement and time *given by sender*). The same photo sent twice
+with one key is one receipt. Filter *From the upload API* shows them. The
+sender's side, every header and answer, is
+[`docs/agent-api.md`, "Sending field photos"](agent-api.md#sending-field-photos);
+the keys and receipts are `db/migrations/0127_photo_upload_api.sql`.
+
 ### Taken in Flood-Net
 
 The **📸 Field Camera** tab takes them itself, stamped, and sends them in by

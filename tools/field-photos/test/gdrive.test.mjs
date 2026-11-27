@@ -464,7 +464,7 @@ test('PHOTO_SOURCE picks the provider — Dropbox unless it says gdrive', () => 
   assert.equal(providerFor('').source, 'dropbox');
   assert.equal(providerFor('gdrive'), gdrive);
   assert.equal(providerFor(' GDrive ').source, 'gdrive');
-  assert.throws(() => providerFor('onedrive'), /PHOTO_SOURCE is "onedrive" — it is dropbox or gdrive/);
+  assert.throws(() => providerFor('onedrive'), /PHOTO_SOURCE is "onedrive" — it is dropbox, gdrive or api/);
 });
 
 test('a folder is its id or its link', () => {

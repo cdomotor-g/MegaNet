@@ -149,11 +149,13 @@ begin
        join pg_catalog.pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'meganet' and p.proname = any(v_fns[1:3])));
 
-  -- 0035's two ways in, at least: 0036 adds a third (gdrive), and any later
-  -- sync is an insert, so the count is not the claim — the two rows are.
+  -- 0035's two ways in, at least: 0036 adds a third (gdrive), 0127 a fourth
+  -- (api) and a sixth placement (sender), so the count is not the claim — the
+  -- rows are.
   perform pg_temp.check_that('the two vocabularies are seeded',
     (select count(*) = 2 from meganet.field_photo_origin where key in ('upload', 'dropbox'))
-    and (select count(*) = 5 from meganet.field_photo_placement));
+    and (select count(*) = 5 from meganet.field_photo_placement
+          where key in ('exif', 'xmp', 'ocr', 'manual', 'station')));
 end
 $$;
 

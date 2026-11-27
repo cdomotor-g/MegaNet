@@ -57,6 +57,8 @@ site already serves to anybody — the ACMA register extract the map draws
 GET of a fixed path: still read-only, and still nothing that is not public.
 The [notify list](#changes) that emails each change is a separate route
 (`/api/notify`), outside the API, and keeps its addresses privately.
+[Sending field photos](#sending-field-photos) in is another separate route
+(`/api/upload/v1`), outside the API, with a key per contractor.
 
 **Public data only.** It can read exactly what an anonymous visitor can
 ([`docs/access.md`](access.md), "The decision: the data stays public"). It
@@ -1788,6 +1790,179 @@ dossier will be extended with anything the templates need that it lacks.
 
 ---
 
+## Sending field photos
+
+**A separate door, with a key.** Everything above is read-only and needs no
+key. Sending photos *in* is a different route,
+`https://floodwarning.net/api/upload/v1`, kept apart from the read-only API
+(it lives in `worker/upload.js`, not `worker/api.js`, and shares nothing with
+it). It is for other apps and contractors who take photos at the stations —
+of gauge boards, loggers, antennas, the site — and want them in Flood-Net's
+Field Photos without anybody dragging files onto a page. Each contractor or
+app has a **photo upload key** of its own, which a Flood-Net administrator
+makes on the Admin tab (Ingest tokens → **Photo upload keys**) and gives them.
+There is no MCP tool for it: it is a plain HTTP route, for scripts and apps.
+
+| | |
+|---|---|
+| Send a photo | `PUT https://floodwarning.net/api/upload/v1/photos` |
+| What became of it | `GET https://floodwarning.net/api/upload/v1/photos/{receipt}` |
+| Check your key | `GET https://floodwarning.net/api/upload/v1/whoami` |
+| Key | `Authorization: Bearer fnp_…` — 68 characters, from a Flood-Net administrator |
+| Photos | JPEG, PNG, WebP or HEIC/HEIF, up to 24 MB each |
+| Limits | 30 uploads a minute per key · each key's daily allowance (500 photos in any 24 hours unless the administrator set another) · 10 wrong keys a minute from one address |
+| Source | `worker/upload.js`, checked by `test/photo-upload.mjs` |
+
+### What happens to a photo
+
+1. Your app `PUT`s the photo with your key and its SHA-256 (the photo's
+   fingerprint). Flood-Net checks the key, the type, the size and the
+   fingerprint, keeps the photo exactly as sent, and answers at once with a
+   **receipt**: `202 Accepted`, `state: "waiting"`.
+2. Within about **fifteen minutes** a scheduled job reads it the way it reads
+   every field photo — the position, time and heading the camera wrote into
+   it (EXIF or XMP), or the ones a field camera app printed on the picture —
+   converts a HEIC to a JPEG, makes a thumbnail, and files it under the
+   nearest station within a kilometre. It appears in **Field Photos** (filter
+   *From the upload API*) and in the **Review panel**'s log, as sent by
+   `api:<your key's label>`.
+3. The receipt then says what became of it: `imported` (placed where it was
+   taken), `unplaced` (in Flood-Net, but nothing said where it was taken — a
+   person places it), `duplicate` (that photo was already in Flood-Net) or
+   `refused` (with the reason).
+
+You do not need to wait for one photo to be filed before sending the next.
+
+### `PUT /api/upload/v1/photos`
+
+The body is the photo's bytes, as they are — not a form, not base64.
+
+| Header | |
+|---|---|
+| `Authorization` | `Bearer fnp_…` — your key. Required. |
+| `Content-Type` | `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`. Required. |
+| `Content-Length` | The photo's size in bytes. Required (every HTTP client sends it for a file). |
+| `X-Content-SHA256` | The SHA-256 of the photo's bytes, as 64 lowercase hex digits. Required: it is how a photo is checked on arrival and how a repeat is recognised. |
+| `X-FloodNet-File-Name` | The photo's file name, shown as its title. Optional (URL-encode a name that is not plain ASCII). |
+
+What you know about the photo can go in the query string. Each is optional,
+and **a position or time is used only when the photo itself has none** — a
+photo's own GPS is believed first:
+
+| Parameter | |
+|---|---|
+| `station` | A Flood-Net station id (`abergowrie_br_al`) to file it under, rather than the nearest. Checked on arrival: an unknown one is refused. |
+| `caption` | A caption, up to 1,000 characters. |
+| `lat`, `lon` | Where it was taken, in decimal degrees (WGS 84), both or neither. Marked in Flood-Net as *given by sender*. |
+| `taken_at` | When it was taken, ISO 8601 **with its time zone** (`2026-11-27T09:30:00+10:00` or `…Z`). |
+
+```sh
+f=IMG_0042.jpg
+curl -sS -X PUT "https://floodwarning.net/api/upload/v1/photos?caption=Gauge%20board%20after%20cleaning" \
+  -H "Authorization: Bearer $FLOODNET_UPLOAD_KEY" \
+  -H "Content-Type: image/jpeg" \
+  -H "X-Content-SHA256: $(sha256sum "$f" | cut -d' ' -f1)" \
+  -H "X-FloodNet-File-Name: $f" \
+  --data-binary @"$f"
+```
+
+```json
+{
+  "receipt": "5f0c2a8e-4b1d-4c6e-9a7b-2d3e4f5a6b7c",
+  "state": "waiting",
+  "status_url": "https://floodwarning.net/api/upload/v1/photos/5f0c2a8e-4b1d-4c6e-9a7b-2d3e4f5a6b7c",
+  "note": "It is read and filed within about fifteen minutes; ask status_url what became of it."
+}
+```
+
+Keep the key out of your code and out of logs: read it from an environment
+variable or your app's secret store, as `$FLOODNET_UPLOAD_KEY` does above.
+
+**Sending a photo twice is safe.** The SHA-256 is the request's identity: the
+same photo sent again with the same key — a retry after a dropped connection,
+a resend from an outbox — answers `200` with the **same receipt** and is not
+stored or counted twice. So when you are not sure a send arrived, send it
+again. A photo already in Flood-Net by another route (dropped on the Field
+Photos tab, from Dropbox) answers `200` with `state: "duplicate"` and the
+photo it already is.
+
+| Status | Means |
+|---|---|
+| `202` | Accepted; the receipt is `waiting`. |
+| `200` | Sent before with this key (`"repeat": true`, the receipt as it now stands), or already in Flood-Net (`"state": "duplicate"`). Nothing was stored. |
+| `400` | Something in the request is wrong — the `error` says what: no or a malformed `X-Content-SHA256`, a photo whose bytes **do not match** it, an unknown station, half a position, a time with no zone. |
+| `401` | No key, or a key that is not live (revoked, past its end date, mistyped). |
+| `409` | That photo is being received right now on another connection; ask again in a minute (`Retry-After`). |
+| `411` | No `Content-Length`. |
+| `413` | Over 24 MB. |
+| `415` | Not a type Flood-Net keeps (an SVG, a GIF, a PDF, a video…). |
+| `429` | Over 30 uploads a minute, or the key's daily allowance is spent. Wait `Retry-After` seconds. |
+| `503` | Uploads are not switched on yet. |
+
+A refusal from a live key (`400`, `413`, `415`, the daily allowance) is also
+written into the Review panel's log, so the person looking after your photos
+sees what did not get in, and why.
+
+### `GET /api/upload/v1/photos/{receipt}`
+
+What became of a photo, for the key that sent it (another key's receipt is a
+`404`):
+
+```json
+{
+  "receipt": "5f0c2a8e-4b1d-4c6e-9a7b-2d3e4f5a6b7c",
+  "state": "imported",
+  "file_name": "IMG_0042.jpg",
+  "sha256": "9f2c…",
+  "byte_size": 2163393,
+  "received_at": "2026-11-27T01:02:03+00:00",
+  "settled_at": "2026-11-27T01:11:40+00:00",
+  "reason": "the camera's GPS, filed under abergowrie_br_al",
+  "photo_id": "0b6f7c1e-2a3b-4c5d-8e9f-0a1b2c3d4e5f",
+  "station_id": "abergowrie_br_al",
+  "status_url": "https://floodwarning.net/api/upload/v1/photos/5f0c2a8e-4b1d-4c6e-9a7b-2d3e4f5a6b7c"
+}
+```
+
+`state` is `waiting`, then one of `imported`, `unplaced`, `duplicate` or
+`refused`. A photo that could not be read because of something on Flood-Net's
+side is tried again on the next run, and refused after the fifth try. The
+photo itself is not served here: field photos are for signed-in Flood-Net
+accounts, in the app.
+
+### `GET /api/upload/v1/whoami`
+
+Checks a key without sending anything: its label, its daily allowance and how
+much of it is used, its end date, and the limits above.
+
+```json
+{ "label": "Acme Surveys field app", "day_limit": 500, "day_used": 12, "day_left": 488,
+  "expires_at": null, "limits": { "max_bytes": 25165824, "types": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"], "per_minute": 30 } }
+```
+
+### Example clients
+
+[`tools/photo-upload/`](../tools/photo-upload/) has two small ready-made
+senders, one for Node and one for Python, that send every photo in a folder,
+skip the ones already sent, and print each receipt:
+
+```sh
+FLOODNET_UPLOAD_KEY=fnp_… node tools/photo-upload/send.mjs ./photos --station abergowrie_br_al
+FLOODNET_UPLOAD_KEY=fnp_… python3 tools/photo-upload/send.py ./photos --caption "Site visit 27 Nov"
+```
+
+### Your key
+
+- Ask a Flood-Net administrator for one, saying who it is for. It is shown to
+  them once; Flood-Net keeps only a fingerprint of it, so a lost key cannot be
+  looked up — the administrator makes another.
+- Keep it secret: anyone with it can send photos as you. Never put it in a
+  repository, a URL, a log or a shared document.
+- If it may have been seen where it should not, ask for it to be revoked. A
+  revoked key is refused within a minute; photos it already sent stay.
+
+---
+
 ## Changes
 
 Every change to the API that someone using it would notice is listed here and
@@ -1796,6 +1971,15 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **27 November 2026 — Send field photos in, with a key of your own.** A new
+  route outside the read-only API, `PUT /api/upload/v1/photos`, takes field
+  photos from other apps and contractors, each with a photo upload key a
+  Flood-Net administrator makes for them. A photo is checked on arrival (type,
+  size, its SHA-256), answered with a receipt, and filed in Field Photos under
+  the nearest station within about fifteen minutes;
+  `GET /api/upload/v1/photos/{receipt}` says what became of it. Sending the
+  same photo twice is safe. See [Sending field photos](#sending-field-photos).
+  The read-only API is unchanged.
 - **17 November 2026 — Decommissioned stations, and a station's own antenna
   height.** Station records (search rows and the dossier's `identity`) gain
   `decommissioned` and `decommissioned_year` — a station taken out of service,
@@ -1984,13 +2168,17 @@ In the Cloudflare dashboard:
 3. **Application name:** `Flood-Net public API`.
 4. **Add public hostname:** domain `floodwarning.net`, path `api/v1`.
 5. **Add public hostname** again: domain `floodwarning.net`, path `api/mcp`.
-6. *(Optional)* once more for path `llms.txt`, so agents can read the index file
+6. **Add public hostname** once more: domain `floodwarning.net`, path
+   `api/upload` — the photo upload route, for contractors' apps. It has keys
+   of its own ([Sending field photos](#sending-field-photos)), so Access in
+   front of it would only stop them.
+7. *(Optional)* once more for path `llms.txt`, so agents can read the index file
    at the root, and for `docs/agent-api.md` if you want this page readable too
    (it is also on GitHub).
-7. Next, to **Access policies** → **Create new policy**: name
+8. Next, to **Access policies** → **Create new policy**: name
    `Public API — bypass`, **Action: Bypass**, **Include → Everyone**. Save it and
    make sure it is the application's only policy.
-8. Save the application. It applies on the next request — no deploy.
+9. Save the application. It applies on the next request — no deploy.
 
 Check it from anywhere:
 

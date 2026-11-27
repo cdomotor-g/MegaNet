@@ -213,6 +213,15 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   adds none. The notify list (`worker/notify.js`, `/api/notify/*`) keeps its
   addresses in R2 only; never put one in the repo, docs, commits, issues, test
   fixtures (use `example.com`) or logs.
+- **Photo upload API:** `/api/upload/v1/*` (`worker/upload.js`) is a write
+  route for other apps' and contractors' field photos, outside the read-only
+  API and sharing nothing with it — never move it into `worker/api.js` or add
+  its tables to `READABLE_RELATIONS`. Each sender has a `fnp_…` key made on
+  the Admin tab; only its SHA-256 is stored or sent anywhere. Never log,
+  commit or quote a key (tests use made-up ones). Its limits
+  (`UPLOAD_RATE`, `UPLOAD_AUTH_FAIL`) match `wrangler.toml`
+  (`npm run agentdocs`); its checks are `npm run photoupload` and
+  `tools/check_photo_upload.sql`.
 - **Migrations to the live database:** run `gh workflow run db-migrate.yml
   --ref main` (`-f dry_run=true` to list first; without `--ref` gh asks
   GraphQL for the default branch, which cloud sessions refuse); it applies

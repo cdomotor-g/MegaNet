@@ -2165,6 +2165,17 @@ jobs:
         working-directory: test
         run: npm run photostore
 
+      # /api/upload/v1/* (worker/upload.js, 0127): field photos from other apps
+      # and contractors, each with a key. Its refusals are the whole of its
+      # safety — a key that is not live, a type, a size, a SHA-256 missing or
+      # not matching, a rate, a repeat stored twice, another key's receipt, the
+      # inbox read without the secret key — and it must stay apart from the
+      # read-only agent API. Offline: R2 is a Map, the project a stand-in.
+      - name: The photo upload route takes photos with a key, once, and nothing else
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run photoupload
+
       # And /api/archive/* (worker/archive.js) with the archiver and the restore
       # tool (tools/archive/, #243): only the secret key writes, nothing is
       # overwritten, and a day is recorded only once it reads back the same —
@@ -2664,6 +2675,14 @@ jobs:
       - name: check_photo_review.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_photo_review.sql
+      # The photo upload API's keys and receipts (0127): minted by an
+      # administrator and kept as a hash, one receipt per key and photo, a
+      # daily allowance, the sender's hints checked before anything is stored,
+      # a receipt seen only by its own key, settled once — and none of it open
+      # to a browser.
+      - name: check_photo_upload.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_photo_upload.sql
       # Level surveys and two-peg tests (0060): editors file them, the database
       # works out a test's error and a survey's misclose for itself, pictures
       # are filed where they belong, and only an administrator applies a survey

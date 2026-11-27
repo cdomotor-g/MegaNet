@@ -112,6 +112,7 @@ const FieldPhotos = (function () {
     ocr:     { chip: 'read off the photo', long: 'read off the picture\'s overlay, by OCR' },
     manual:  { chip: 'placed by hand',    long: 'placed by hand' },
     station: { chip: 'at the station',    long: 'put at the station\'s recorded position' },
+    sender:  { chip: 'given by sender',   long: 'given by the app that sent it in over the upload API — the photo itself had no position' },
   };
 
   const S = () => state.photos;
@@ -481,6 +482,7 @@ const FieldPhotos = (function () {
     else if (f.show === 'station' && f.station) q += `&station_id=eq.${encodeURIComponent(f.station)}`;
     else if (f.show === 'dropbox') q += '&origin=eq.dropbox';
     else if (f.show === 'gdrive') q += '&origin=eq.gdrive';
+    else if (f.show === 'api') q += '&origin=eq.api';
     return q;
   }
 
@@ -1535,6 +1537,7 @@ const FieldPhotos = (function () {
       chip('unplaced', `Unplaced${known(n) ? ` (${n}${n >= 1000 ? '+' : ''})` : ''}`),
       chip('dropbox', 'From Dropbox'),
       chip('gdrive', 'From Google Drive'),
+      chip('api', termHtml('From the upload API', 'Photos other apps and contractors sent in over the upload API, each with a key an administrator made on the Admin tab.')),
       st ? chip('station', `At ${esc(st.name)}`) : '',
     ].join('');
   }
@@ -1557,6 +1560,7 @@ const FieldPhotos = (function () {
         : s.filter.show === 'station' ? 'No photos have been filed under this station yet.'
         : s.filter.show === 'dropbox' ? 'Nothing has come in from Dropbox yet.'
         : s.filter.show === 'gdrive' ? 'Nothing has come in from Google Drive yet.'
+        : s.filter.show === 'api' ? 'Nothing has come in over the upload API yet.'
         : 'No field photos yet. Add some above.'}</p>`;
     }
     const f = s.filter;
@@ -1595,6 +1599,10 @@ const FieldPhotos = (function () {
                link: 'Linking a Google Drive folder',
                how: `Photos saved into the linked Google Drive folder are imported by a scheduled job, and placed
                      the same way as the ones dropped here. Setting it up:`, after: ' in docs/field-photos.md.' },
+    api:     { name: 'The upload API', doc: 'docs/agent-api.md#sending-field-photos', link: 'Sending field photos',
+               how: `Photos other apps and contractors send in over the upload API, each with a key made on the Admin
+                     tab, are filed by a scheduled job about every fifteen minutes, placed the same way as the ones
+                     dropped here. How a contractor sends them:`, after: ' in docs/agent-api.md.' },
   };
   function syncAgo(t) {
     const m = Math.round((Date.now() - Date.parse(t)) / 60000);
@@ -1606,7 +1614,7 @@ const FieldPhotos = (function () {
     if (!signedIn()) return '<p class="small txt-muted">Sign in to see what the Dropbox and Google Drive syncs have done.</p>';
     if (!s.sync && !s.syncError) return '<p class="small">Loading…</p>';
     const rows = s.sync || [];
-    const keys = [...new Set(['dropbox', 'gdrive', ...rows.map(r => r.source)])];
+    const keys = [...new Set(['dropbox', 'gdrive', 'api', ...rows.map(r => r.source)])];
     return `${s.syncError ? `<p class="small txt-bad">The syncs' report could not be read — ${esc(s.syncError)}.</p>` : ''}
       ${keys.map(k => sourceHtml(k, s.syncError ? undefined : rows.find(r => r.source === k) || null)).join('')}`;
   }
@@ -2225,7 +2233,8 @@ const FieldPhotos = (function () {
       : '';
     const rows = [];
     rows.push(['Taken', whenText(r) ? `${esc(whenText(r))}${zone === 'assumed' ? ' <span class="small txt-muted">(zone assumed from where it was taken)</span>' : ''}${
-      r.taken_source === 'ocr' ? ' <span class="small txt-muted">(read off the photo)</span>' : ''}` : '<span class="txt-muted">Not known</span>']);
+      r.taken_source === 'ocr' ? ' <span class="small txt-muted">(read off the photo)</span>'
+        : r.taken_source === 'sender' ? ' <span class="small txt-muted">(given by the app that sent it)</span>' : ''}` : '<span class="txt-muted">Not known</span>']);
     rows.push(['Where', placed
       ? `<span class="fp-coord">${esc(fmtCoord(r.lat, r.lon))}</span>${accHtml(r.accuracy_m)}
          <br><span class="small">${esc(pl ? pl.long : r.placement)}${r.placement === 'ocr' && ocr && ocr.confidence ? ` — ${esc(ocr.confidence)} confidence` : ''}</span>${readAccHtml(r)}`
@@ -2235,7 +2244,8 @@ const FieldPhotos = (function () {
     rows.push(['Station', st ? `${esc(st.name)}${rel ? ` <span class="small txt-muted">— ${esc(rel)}${r.station_auto ? ', the nearest' : ''}</span>` : ''}` : '<span class="txt-muted">None within a kilometre</span>']);
     rows.push(['File', `${esc(r.title || '—')} <span class="small txt-muted">${r.width ? `${r.width} × ${r.height} · ` : ''}${esc(mb(r.byte_size || 0))}</span>`]);
     rows.push(['Added', `${esc(r.uploaded_by || '—')}${r.created_at ? `, ${esc(String(r.created_at).slice(0, 10))}` : ''}${
-      r.origin === 'dropbox' ? ' <span class="fp-chip">Dropbox</span>' : r.origin === 'gdrive' ? ' <span class="fp-chip">Google Drive</span>' : ''}`]);
+      r.origin === 'dropbox' ? ' <span class="fp-chip">Dropbox</span>' : r.origin === 'gdrive' ? ' <span class="fp-chip">Google Drive</span>'
+        : r.origin === 'api' ? ' <span class="fp-chip term-chip" title="Sent in over the upload API by another app or a contractor, with its own key.">Upload API</span>' : ''}`]);
     const may = signedIn();
     return `
       <dl class="fp-v-facts">${rows.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>

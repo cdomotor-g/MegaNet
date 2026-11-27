@@ -78,7 +78,7 @@ const PhotoReview = (function () {
     failed:    { word: 'Failed',             cls: 'bad' },
     skipped:   { word: 'Skipped',            cls: 'muted' },
   };
-  const ORIGIN = { upload: 'This tab', dropbox: 'Dropbox', gdrive: 'Google Drive' };
+  const ORIGIN = { upload: 'This tab', dropbox: 'Dropbox', gdrive: 'Google Drive', api: 'Upload API' };
   const STATUS = { approved: 'Approved', rejected: 'Rejected', superseded: 'Superseded' };
 
   let kinds = null, kindsP = null;   // meganet.equipment_kind, public

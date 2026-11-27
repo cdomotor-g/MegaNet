@@ -2,6 +2,23 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-27-photo-upload",
+      "date": "2026-11-27",
+      "title": "Send field photos in, with a key of your own",
+      "summary": "A new route, separate from the read-only API, lets other apps and contractors send field photos into Flood-Net: PUT /api/upload/v1/photos with the photo's bytes, its SHA-256 in X-Content-SHA256, and a photo upload key a Flood-Net administrator makes for you (Authorization: Bearer fnp_…). It takes JPEG, PNG, WebP and HEIC photos up to 24 MB, answers at once with a receipt, and files the photo in Field Photos under the nearest station within about fifteen minutes; GET /api/upload/v1/photos/{receipt} says what became of it, and GET /api/upload/v1/whoami checks a key. A position, time, caption or station sent with a photo is used only where the photo itself says nothing. Sending the same photo twice with the same key returns the same receipt and stores nothing twice. Limits: 30 uploads a minute per key, and each key's daily allowance (500 unless set otherwise). The read-only API at /api/v1 and /api/mcp is unchanged and still needs no key.",
+      "breaking": false,
+      "links": [
+        {
+          "text": "Sending field photos",
+          "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#sending-field-photos"
+        },
+        {
+          "text": "The upload API on the API page",
+          "url": "https://floodwarning.net/api#upload"
+        }
+      ]
+    },
+    {
       "id": "2026-11-17-decommissioned-antenna-height",
       "date": "2026-11-17",
       "title": "Decommissioned stations, and a station's own antenna height",

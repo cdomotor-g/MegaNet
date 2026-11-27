@@ -6,6 +6,14 @@
 //                 revoked here instead of in the Supabase SQL editor; and the
 //                 base stations *asking* for one, approved or turned down here.
 //
+// And a second panel under it, "Photo upload keys" (0127): a key per
+// contractor or app that sends field photos in over the upload API
+// (worker/upload.js, /api/upload/v1/photos). Minted here with a label, a daily
+// allowance and an optional end date, shown once — the database keeps only
+// its hash — and revoked here. Each row says how much of its day it has used
+// and what became of what it sent. admin_photo_upload_tokens(),
+// admin_create_photo_upload_token(), admin_revoke_photo_upload_token().
+//
 // After core.js and datastore.js (dbRpc), before admin.js, which draws it into
 // #adm-tokens and loads it from Admin.init(). Nothing here runs at load;
 // init.js calls restoreFromUrl() once, after the first render.
@@ -88,6 +96,17 @@ const AdminTokens = (function () {
     kind:      'What decodes the readings: rtl-sdr (a software radio stick), quansheng or ert-a2 (a radio on a serial cable), or serial (another serial receiver).',
     location:  'Where the receivers say they are, and how they know: from GPS (the only exact one), the browser, typed in, the station they sit at, or worked out from the stations they hear.',
   };
+  // The photo upload keys' words, on hover and in the fold under the table.
+  const PK_WORDS = {
+    allowance: 'How many photos the key may send in any 24 hours. A photo sent again with the same key is not counted twice. 500 unless set otherwise; at most 5000.',
+    today:     'Photos this key has sent in the last 24 hours, out of its allowance. Past the allowance, the upload API answers 429 until older ones fall out of the 24 hours.',
+    waiting:   'Photos received but not yet read and filed. The upload sync runs every fifteen minutes, so a photo should not wait longer than that.',
+    filed:     'Photos from this key now in Field Photos — placed where they were taken, or in Unplaced when nothing said where.',
+    refused:   'Photos from this key that were not taken in: not a photo Flood-Net keeps, damaged, or tried five times without success. The Review panel says why for each.',
+    ends:      'After this date the key stops working on its own. No date: it works until it is revoked.',
+  };
+  let pkList = null, pkErr = null, pkMinted = null, pkNote = '', pkMissing = false;
+
   const LOCATION = { gps: 'GPS', browser: 'the browser', manual: 'typed in', station: 'its station', heard: 'the stations it hears' };
 
   // "18 Bateson — RTL-SDR · 151.5375" is the device and the channel; a name
@@ -341,8 +360,133 @@ const AdminTokens = (function () {
           + '</dl></details>';
       }
     }
-    return '<div class="panel">' + head + body + '</div>';
+    return '<div class="panel">' + head + body + '</div>' + photoKeysHtml();
   }
+
+  // ── photo upload keys (0127) ──────────────────────────────────────────────
+
+  function photoKeysHtml() {
+    if (!isAdmin()) return '';
+    const api = typeof docUrl === 'function' ? docUrl('docs/agent-api.md#sending-field-photos') : 'docs/agent-api.md#sending-field-photos';
+    let h = '<div class="panel" id="adm-pk"><div class="panel-header"><h2 id="adm-pk-h">Photo upload keys</h2></div>'
+      + '<p class="small">One key per <strong>contractor or app</strong> that sends field photos in over the upload API. '
+      + 'Photos it sends are read and filed in Field Photos within about fifteen minutes, under the nearest station, and each one is in the Review panel\'s log. '
+      + 'A key is shown once, when it is made; only its hash is kept. Give the contractor the key and '
+      + '<a href="/api#upload" target="_blank" rel="noopener">the instructions</a> '
+      + '(<a href="' + escAttr(api) + '" target="_blank" rel="noopener">in full</a>).</p>';
+    if (pkMissing) {
+      return h + '<p class="small txt-muted">The database does not have this yet — apply db/migrations/0127_photo_upload_api.sql.</p></div>';
+    }
+    h += '<div class="adm-tok-form">'
+      + '<label>Label — the contractor or app <input type="text" id="adm-pk-label" maxlength="120" placeholder="e.g. Acme Surveys field app"></label>'
+      + '<label>' + termHtml('Photos a day', PK_WORDS.allowance) + ' <input type="number" id="adm-pk-day" min="1" max="5000" step="1" value="500"></label>'
+      + '<label>' + termHtml('Ends', PK_WORDS.ends) + ' (optional) <input type="date" id="adm-pk-ends"></label>'
+      + '<button class="primary" onclick="AdminTokens.pkCreate()">Create key</button>'
+      + '</div>';
+    if (pkMinted) {
+      h += '<div class="note adm-tok-minted" role="status">'
+        + '<p><strong>' + esc(pkMinted.label) + '</strong> — copy this now; it will not be shown again.</p>'
+        + '<p><code class="adm-tok-value" id="adm-pk-value">' + esc(pkMinted.token) + '</code></p>'
+        + '<div class="button-group">'
+        + '<button class="ghost" onclick="AdminTokens.pkCopy()">Copy</button>'
+        + '<button class="ghost" onclick="AdminTokens.pkDismiss()">Done</button></div>'
+        + '<p class="small qs-dim">Send it to the contractor by a private channel, not in an email thread or a ticket many people read. '
+        + 'If it is ever seen where it should not be, revoke it and make another.</p>'
+        + '</div>';
+    }
+    if (pkNote) h += '<p class="small" role="status">' + esc(pkNote) + '</p>';
+    if (pkErr) h += '<p class="small txt-bad">' + esc(pkErr) + '</p>';
+    if (!pkList) return h + (pkErr ? '' : '<p class="small">Loading…</p>') + '</div>';
+    const th = (label, k) => '<th scope="col">' + (k ? termHtml(label, PK_WORDS[k]) : esc(label)) + '</th>';
+    h += '<div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="adm-pk-h"><table class="adm-table">'
+      + '<caption class="sr-only">Photo upload keys, live first, most recently used first</caption>'
+      + '<thead><tr><th scope="col">Label</th>' + th('Today', 'today') + th('Waiting', 'waiting') + th('Filed', 'filed') + th('Refused', 'refused')
+      + th('Last used') + th('Made') + th('Status') + '</tr></thead><tbody>'
+      + (pkList.length ? pkList.map(t => {
+          const live = !t.revoked_at && !(t.expires_at && Date.parse(t.expires_at) < Date.now());
+          return '<tr class="adm-tok-row"><th scope="row">' + esc(t.label)
+            + (t.expires_at ? '<div class="small qs-dim">ends ' + when(t.expires_at) + '</div>' : '') + '</th>'
+            + '<td class="small">' + Number(t.day_used || 0) + ' of ' + Number(t.day_limit) + '</td>'
+            + '<td class="small">' + Number(t.waiting || 0) + '</td>'
+            + '<td class="small">' + Number(t.imported || 0) + '</td>'
+            + '<td class="small">' + Number(t.refused || 0) + '</td>'
+            + '<td class="small">' + when(t.last_used_at) + '</td>'
+            + '<td class="small">' + when(t.created_at) + (t.created_by ? '<div class="qs-dim">' + esc(t.created_by) + '</div>' : '') + '</td>'
+            + '<td>' + (t.revoked_at ? '<span class="badge">revoked ' + when(t.revoked_at) + '</span>'
+              : !live ? '<span class="badge">ended</span>'
+              : '<button class="ghost" onclick="AdminTokens.pkRevoke(' + Number(t.id) + ')" aria-label="Revoke ' + esc(t.label) + '">Revoke…</button>') + '</td></tr>';
+        }).join('')
+        : '<tr><td colspan="8" class="small">No photo upload keys yet.</td></tr>')
+      + '</tbody></table></div>';
+    // The same meanings as the hovers, for a finger or a keyboard.
+    h += '<details class="adm-why"><summary>What the words about photo upload keys mean</summary><dl class="adm-words">'
+      + [['allowance', 'Photos a day'], ['today', 'Today'], ['waiting', 'Waiting'], ['filed', 'Filed'], ['refused', 'Refused'], ['ends', 'Ends']]
+        .map(([k, label]) => '<dt>' + esc(label) + '</dt><dd>' + esc(PK_WORDS[k]) + '</dd>').join('')
+      + '</dl></details>';
+    return h + '</div>';
+  }
+
+  async function pkLoad() {
+    try {
+      const r = await dbRpc('admin_photo_upload_tokens', {});
+      pkList = Array.isArray(r) ? r : [];
+      pkErr = null; pkMissing = false;
+    } catch (err) {
+      if (err.status === 404) pkMissing = true;
+      else pkErr = 'Could not load the photo upload keys: ' + err.message;
+    }
+    repaint();
+  }
+
+  async function pkCreate() {
+    const label = ((document.getElementById('adm-pk-label') || {}).value || '').trim();
+    const day = Number((document.getElementById('adm-pk-day') || {}).value || 500);
+    const ends = (document.getElementById('adm-pk-ends') || {}).value || '';
+    if (!label) { pkErr = 'Give the key a label first — the contractor or app it is for.'; repaint(); return; }
+    pkNote = ''; pkErr = null;
+    try {
+      // The end of the chosen day, where this browser is.
+      const until = ends ? new Date(ends + 'T23:59:59').toISOString() : null;
+      const r = await dbRpc('admin_create_photo_upload_token', { p_label: label, p_day_limit: day, p_expires_at: until });
+      pkMinted = { label: r.label, token: r.token };
+      announce('Photo upload key made for ' + r.label + '. Copy it now; it is shown once.');
+      await pkLoad();
+    } catch (err) {
+      pkErr = 'Could not make the key: ' + err.message;
+      repaint();
+    }
+  }
+
+  async function pkRevoke(id) {
+    const t = (pkList || []).find(x => x.id === id);
+    if (!t) return;
+    if (!(await confirmDialog({ title: 'Revoke “' + t.label + '”?',
+      message: 'Uploads with this key are refused within a minute. Photos it has already sent are still filed. '
+        + 'A replacement is a new key; a revoked one never comes back.',
+      confirm: 'Revoke the key', danger: true }))) return;
+    try {
+      await dbRpc('admin_revoke_photo_upload_token', { p_id: id });
+      pkNote = t.label + ' revoked.';
+      announce(pkNote);
+      await pkLoad();
+    } catch (err) {
+      pkErr = 'Could not revoke: ' + err.message;
+      repaint();
+    }
+  }
+
+  async function pkCopy() {
+    if (!pkMinted) return;
+    let ok = false;
+    try { await navigator.clipboard.writeText(pkMinted.token); ok = true; } catch (_) {
+      const el = document.getElementById('adm-pk-value');
+      if (el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+    }
+    pkNote = ok ? 'Copied.' : 'Selected — press Ctrl+C to copy.';
+    repaint();
+  }
+
+  function pkDismiss() { pkMinted = null; pkNote = ''; repaint(); }
 
   function repaint() {
     const el = document.getElementById('adm-tokens');
@@ -373,6 +517,7 @@ const AdminTokens = (function () {
     }
     loading = false;
     repaint();
+    pkLoad();
     await loadReqs(true);
     startPolling();
   }
@@ -547,6 +692,7 @@ const AdminTokens = (function () {
 
   function authChanged() {
     list = null; minted = null; error = null; note = '';
+    pkList = null; pkMinted = null; pkErr = null; pkNote = ''; pkMissing = false;
     reqs = null; reqErr = null; reqSig = ''; approving = null; reqMissing = false;
     stopPolling();
     if (state.activeTab === 'admin') { repaint(); load(); }
@@ -570,7 +716,8 @@ const AdminTokens = (function () {
   }
 
   return { render, load, create, revoke, copy, useHere, dismiss, authChanged, restoreFromUrl,
-           openApprove, approveField, cancelApprove, approve, deny, toggleReceivers };
+           openApprove, approveField, cancelApprove, approve, deny, toggleReceivers,
+           pkCreate, pkRevoke, pkCopy, pkDismiss };
 })();
 
 if (typeof window !== 'undefined') window.AdminTokens = AdminTokens;

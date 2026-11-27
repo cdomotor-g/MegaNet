@@ -61,6 +61,7 @@ import crypto from 'node:crypto';
 import { readPhoto, PhotoMeta } from './read.mjs';
 import { dropbox } from './dropbox.mjs';
 import { gdrive } from './gdrive.mjs';
+import { api } from './api.mjs';
 import { openZip, ZipError, ZIP_LIMITS } from './zip.mjs';
 import { client, DEFAULT_PHOTO_STORE } from './supabase.mjs';
 
@@ -74,7 +75,7 @@ export function photoStoreFor(env) {
   const project = (env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/+$/, '');
   return project === DEFAULT_SUPABASE_URL ? DEFAULT_PHOTO_STORE : null;
 }
-export const PROVIDERS = Object.freeze({ dropbox, gdrive });
+export const PROVIDERS = Object.freeze({ dropbox, gdrive, api });
 const PHOTO_EXT = /\.(jpe?g|png|heic|heif|webp)$/i;
 const ZIP_EXT = /\.zip$/i;
 const MAX_BYTES = 24 * 1024 * 1024;        // meganet.attachment_type's limit for a picture (0010: 25165824)
@@ -91,11 +92,32 @@ const photoInZip = e => PHOTO_EXT.test(e.name) && !e.name.startsWith('._') && !/
 // into a look-up as a quoted value and comes back as it was written.
 const inZip = (zipRef, path) => `${zipRef}#${path.replace(/[%"]/g, c => (c === '%' ? '%25' : '%22'))}`;
 
+// What a sender said about a photo (the upload API's hints, 0127), applied to
+// what the photo said about itself: a caption and a station as given; a
+// position and a time only where the photo has none, marked 'sender' so the
+// tab says where they came from.
+export function withHints(p, h) {
+  if (h.caption) p.caption = String(h.caption).slice(0, 1000);
+  if (h.station_id) p.station_id = h.station_id;
+  if ((p.lat === undefined || p.lat === null) && Number.isFinite(Number(h.lat)) && Number.isFinite(Number(h.lon))
+      && h.lat !== null && h.lon !== null && h.lat !== '' && h.lon !== '') {
+    p.lat = +Number(h.lat).toFixed(7);
+    p.lon = +Number(h.lon).toFixed(7);
+    p.placement = 'sender';
+    delete p.accuracy_m;
+  }
+  if (!p.taken_at && h.taken_at) {
+    p.taken_at = h.taken_at;
+    p.taken_source = 'sender';
+  }
+  return p;
+}
+
 // PHOTO_SOURCE: dropbox (the default, for the workflow that predates the
 // setting) or gdrive.
 export function providerFor(name) {
   const key = String(name || '').trim().toLowerCase() || 'dropbox';
-  if (!Object.hasOwn(PROVIDERS, key)) throw new Error(`PHOTO_SOURCE is "${name}" — it is dropbox or gdrive`);
+  if (!Object.hasOwn(PROVIDERS, key)) throw new Error(`PHOTO_SOURCE is "${name}" — it is dropbox, gdrive or api`);
   return PROVIDERS[key];
 }
 
@@ -132,8 +154,18 @@ export async function run({
     file_name: e.inZip || e.name || null, archive_name: e.archive || null,
     sha256: sha || null, byte_size: bytes ?? (Number.isFinite(e.size) && e.size > 0 ? e.size : null),
     outcome, reason: reason ? String(reason).slice(0, 500) : null,
-    photo_id: id || null, station_id: station || null, uploaded_by: by,
+    photo_id: id || null, station_id: station || null, uploaded_by: e.by || by,
   });
+
+  // A provider that answers for each file (the upload API's receipts) is told
+  // what became of it. Best effort, like the log: a receipt not settled is
+  // settled by the next run, which finds the photo imported already.
+  const settle = async (e, out) => {
+    if (typeof provider.settle !== 'function' || !session) return;
+    try { await provider.settle(session, e, out); }
+    catch (err) { log(`  could not settle ${e.path || e.name} — ${(err && err.message) || err}`); }
+  };
+  let session = null;
 
   const db = client(fetch, { url: env.SUPABASE_URL || DEFAULT_SUPABASE_URL, key: env.SUPABASE_SECRET_KEY,
                             store: photoStoreFor(env), log });
@@ -142,7 +174,7 @@ export async function run({
     prior = (await db.select(`field_photo_sync?source=eq.${provider.source}&select=runs`)).at(0) || null;
     const saved = (await db.select(`field_photo_sync_cursor?source=eq.${provider.source}&select=cursor`)).at(0);
 
-    const session = await provider.connect(settings, fetch, { now });
+    session = await provider.connect(settings, fetch, { now });
     report.account = session.account || null;
     if (session.label) report.folder = session.label;
     by = session.by;
@@ -160,7 +192,7 @@ export async function run({
     log(`${photos.length} new or changed photo${photos.length === 1 ? '' : 's'}${zips ? ` and ${zips} zip${zips === 1 ? '' : 's'}` : ''} in ${report.folder}${session.whose || ''}`);
 
     const known = await imported(photos);
-    skipKnown(photos, known);
+    await skipKnown(photos, known);
 
     let handled = 0;
     let complete = true;
@@ -198,15 +230,21 @@ export async function run({
           chars += n;
           i++;
         }
-        const rows = await db.select(`field_photo?select=id,origin_ref,deleted_at&origin=eq.${provider.source}&origin_ref=in.(${encodeURIComponent(refs.join(','))})`);
+        const rows = await db.select(`field_photo?select=id,origin_ref,deleted_at,lat,station_id&origin=eq.${provider.source}&origin_ref=in.(${encodeURIComponent(refs.join(','))})`);
         for (const r of rows) known.set(r.origin_ref, r);
       }
       return known;
     }
 
-    function skipKnown(list, known) {
+    async function skipKnown(list, known) {
       const before = list.filter(e => known.has(e.ref));
       report.skipped += before.length;
+      for (const e of before) {
+        const had = known.get(e.ref);
+        await settle(e, had.deleted_at
+          ? { outcome: 'refused', reason: 'removed from Flood-Net — not brought back' }
+          : { outcome: had.lat === null || had.lat === undefined ? 'unplaced' : 'imported', id: had.id, station: had.station_id || null });
+      }
       if (before.length <= 20) {
         for (const e of before) {
           const had = known.get(e.ref);
@@ -253,7 +291,7 @@ export async function run({
       report.seen += inside.length;
       log(`  ${z.path || z.name}: ${inside.length} photo${inside.length === 1 ? '' : 's'} in it${zip.others ? `, and ${zip.others} other file${zip.others === 1 ? '' : 's'} left alone` : ''}`);
       const known = await imported(inside);
-      skipKnown(inside, known);
+      await skipKnown(inside, known);
       for (const e of inside) {
         if (known.has(e.ref)) continue;
         if (spent()) return false;
@@ -278,12 +316,15 @@ export async function run({
         if (out.unplaced) report.unplaced++;
         note(e, out.result, out.reason, out.id);
         record(e, at, out.outcome, { reason: out.reason, id: out.id, station: out.station, sha: got.sha, bytes: got.bytes });
+        await settle(e, { outcome: out.outcome, id: out.id, station: out.station, reason: out.reason });
       } catch (err) {
         const why = (err && err.message) || String(err);
         const result = err instanceof ZipError && err.refused ? 'skipped' : 'failed';
         report[result]++;
         note(e, result, why);
-        record(e, at, err instanceof ZipError || (err && err.refused) ? 'refused' : 'failed', { reason: why, sha: got.sha, bytes: got.bytes });
+        const outcome = err instanceof ZipError || (err && err.refused) ? 'refused' : 'failed';
+        record(e, at, outcome, { reason: why, sha: got.sha, bytes: got.bytes });
+        if (!(err && err.fatal)) await settle(e, { outcome, reason: why });
         if (err && err.fatal) throw err;
       }
     }
@@ -320,14 +361,24 @@ export async function run({
       Object.assign(p, {
         storage_path: path, thumb_path: thumb, content_type: r.contentType,
         byte_size: r.upload.length, sha256: r.sha,
-        origin: provider.source, origin_ref: e.ref, uploaded_by: by,
+        origin: provider.source, origin_ref: e.ref, uploaded_by: e.by || by,
       });
       p.meta[provider.source] = e.meta;
+      if (e.hints) withHints(p, e.hints);
       if (r.ocrError) p.meta.ocr_error = String(r.ocrError).slice(0, 300);
 
       let row;
       try {
-        row = await db.rpc('add_field_photo', { p_photo: p });
+        try {
+          row = await db.rpc('add_field_photo', { p_photo: p });
+        } catch (err) {
+          // A station the sender named that has gone since it was checked
+          // (0127 checks it on arrival): filed by its position instead.
+          if (!(e.hints && e.hints.station_id && err && err.code === '23503' && /no such station/.test(err.message || ''))) throw err;
+          delete p.station_id;
+          p.meta[provider.source] = { ...p.meta[provider.source], station_gone: e.hints.station_id };
+          row = await db.rpc('add_field_photo', { p_photo: p });
+        }
       } catch (err) {
         await takeDown();
         // 23505 — this photo, or this file, is in MegaNet already. 23503 is a
@@ -348,7 +399,7 @@ export async function run({
       return {
         result: 'imported', outcome: placed ? 'imported' : 'unplaced', id: row && row.id, unplaced: !placed,
         station: (row && row.station_id) || null,
-        reason: placed ? `${r.pos.placement === 'ocr' ? `read off the photo (${r.pos.confidence})` : 'the camera\'s GPS'}${row.station_id ? `, filed under ${row.station_id}` : ''}`
+        reason: placed ? `${!r.pos ? 'where the app that sent it said' : r.pos.placement === 'ocr' ? `read off the photo (${r.pos.confidence})` : 'the camera\'s GPS'}${row.station_id ? `, filed under ${row.station_id}` : ''}`
                        : 'nothing says where it was taken — it is in Unplaced',
       };
     }

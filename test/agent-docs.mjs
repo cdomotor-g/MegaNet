@@ -30,6 +30,7 @@ import { REPORT_RATE } from '../worker/report.js';
 import { DRIVE_RATE } from '../worker/drive.js';
 import { NOTIFY_RATE } from '../worker/notify.js';
 import { SORT_RATE, SORT_AUTH_FAIL } from '../worker/sort.js';
+import { UPLOAD_RATE, UPLOAD_AUTH_FAIL } from '../worker/upload.js';
 import { parseChangelog } from '../worker/changelog.js';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
@@ -193,9 +194,17 @@ for (const rule of [SORT_RATE, SORT_AUTH_FAIL]) {
   check(`wrangler.toml declares ${rule.binding} as ${rule.limit} / ${rule.period} s`,
     b && b.limit === rule.limit && b.period === rule.period, b ? `${b.limit} / ${b.period}` : 'not declared');
 }
+// …and the photo upload route's two (worker/upload.js): every upload per key,
+// and the wrong keys per address.
+for (const rule of [UPLOAD_RATE, UPLOAD_AUTH_FAIL]) {
+  const b = blocks.find(x => x.name === rule.binding);
+  check(`wrangler.toml declares ${rule.binding} as ${rule.limit} / ${rule.period} s`,
+    b && b.limit === rule.limit && b.period === rule.period, b ? `${b.limit} / ${b.period}` : 'not declared');
+}
 check('wrangler.toml declares no rate limit the code does not read',
   blocks.every(b => b.name === REPORT_RATE.binding || b.name === DRIVE_RATE.binding || b.name === NOTIFY_RATE.binding
     || b.name === SORT_RATE.binding || b.name === SORT_AUTH_FAIL.binding
+    || b.name === UPLOAD_RATE.binding || b.name === UPLOAD_AUTH_FAIL.binding
     || api.RATE_LIMITS.some(r => r.binding === b.name)),
   blocks.map(b => b.name).join(', '));
 check('each rate limit period is one Cloudflare accepts (10 or 60)', blocks.every(b => b.period === 10 || b.period === 60));

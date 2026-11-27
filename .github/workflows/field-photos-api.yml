@@ -1,0 +1,93 @@
+# Field photos from the upload API: every fifteen minutes, the photos other
+# apps and contractors sent to https://floodwarning.net/api/upload/v1/photos
+# (worker/upload.js) — waiting, unread, in the inbox — are read, placed where
+# they were taken and filed in Flood-Net by the same run as the Dropbox and
+# Google Drive syncs, with the inbox as the place it reads:
+# tools/field-photos/sync.mjs with PHOTO_SOURCE=api, lib/api.mjs. Each photo's
+# receipt is then settled, so the sender can ask what became of it.
+# docs/agent-api.md ("Sending field photos") is the sender's side;
+# db/migrations/0127 the database's.
+#
+# It needs one secret (Settings → Secrets and variables → Actions), the one the
+# other syncs already use:
+#
+#   SUPABASE_SECRET_KEY   the project's secret key — it reads the waiting
+#                         receipts, settles them, and reads and clears the inbox
+#
+# A run with nothing waiting asks the database one question and stops before
+# installing anything. The key is never printed: the job hands it to curl and
+# the sync in the environment and nowhere else — the Actions log of a public
+# repository is public.
+
+name: Field photos from the upload API
+
+on:
+  schedule:
+    # A quarter of an hour, eleven minutes after the Dropbox sync's and four
+    # after Google Drive's — none of the three start together.
+    - cron: '11-59/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time, and a run is never cancelled for the next: a sync stopped
+# mid-upload leaves an object nothing points at. The next one waits.
+concurrency:
+  group: field-photos-api
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PHOTO_SOURCE:        api
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_URL:        https://jjprlritvhdqpvphfrnu.supabase.co
+    steps:
+      - name: Anything waiting?
+        id: waiting
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_SECRET_KEY is not set — nothing to sync."
+            echo "any=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          code=$(curl -s -o /tmp/waiting.json -w '%{http_code}' -X POST "$SUPABASE_URL/rest/v1/rpc/photo_upload_waiting" \
+            -H "apikey: $SUPABASE_SECRET_KEY" -H "Authorization: Bearer $SUPABASE_SECRET_KEY" \
+            -H 'Content-Profile: meganet' -H 'Accept-Profile: meganet' -H 'Content-Type: application/json' \
+            -d '{"p_limit":1}')
+          if [ "$code" = "404" ]; then
+            echo "::notice::The upload API is not in the database yet (db/migrations/0127) — nothing to sync."
+            echo "any=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::The database answered HTTP $code when asked what is waiting."
+            exit 1
+          fi
+          if [ "$(cat /tmp/waiting.json)" = "[]" ]; then
+            echo "Nothing waiting in the inbox."
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.waiting.outputs.any == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.waiting.outputs.any == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/field-photos/package-lock.json
+
+      - name: Install the sync
+        if: steps.waiting.outputs.any == 'true'
+        working-directory: tools/field-photos
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Sync
+        if: steps.waiting.outputs.any == 'true'
+        working-directory: tools/field-photos
+        run: node sync.mjs
