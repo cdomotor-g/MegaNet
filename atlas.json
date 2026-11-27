@@ -33,6 +33,7 @@
     "summary": "Live and in daily use (database schema 113): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email and the ACMA download link wait on the owner.",
     "now": [
       "Field photos from other apps and contractors (0127): a photo upload API at /api/upload/v1 with a key per contractor made on the Admin tab, outside the read-only agent API; photos are filed in Field Photos within about fifteen minutes by the same reader as Dropbox and Google Drive, each in the Review panel's log",
+      "Noisy ALERT2 concentrator held back (0126): source 33300 relayed legacy reports made of noise, 85 % of what 151.5375 MHz stored; its readings are no longer stored or counted as heard, what it put in is taken out, and #301/#302 make the next one show up by itself",
       "The tabs rationalised (November 2026): 62 tabs are 42 in 10 groups — tools that did one job between them are one tab with their old pages as views across its top (Nearby Transmitters, Signal Sources, the Decoder with a box that works out which decoder a paste needs, Charts, Inspections, Photos, Near Me, Bit Faults, Field Days, the Guide); Offline & Install is a banner button, Views is in Theme & layout, Admin opens with a list of its panels, and a pasted ARRO address in Ctrl+K reopens that page in ARRO admin; old links still land",
       "Base stations that are told about, and get themselves back (0113, RPi ALERT 0.23): the administrators are emailed when a base station has not checked in for 30 minutes and again when it is back; the Base Stations tab says what each station does when it loses touch and gives its own account of the last time; EPIC #288 is a baseline for an agent that watches the network and acts where it safely can — nothing built until the owner settles its ground rules",
       "Radio Licensing (kb-licensing.js, licence-docs.js): a Knowledge base lesson on what the transmitters and receivers need by way of an ACMA licence, every rule quoted from its document and opened at the sentence (docs/acma/ keeps RALI FX16, FX19 and the Fixed Licence determination); the 30 km question answered from them — a planning rule, not the law; the ACMA licences tool's fourth state, Beyond a licence's area, for the 203 gauges that report to a licensed repeater from outside its service area; and the label a transmitter at a shared site must carry",
@@ -994,6 +995,12 @@
       "what": "Recast Nitto (nitwit) in voices/cast.json with a voice of his own; his current one is too like another Droggie's, so Flood-Net's bulletins bench him until then.",
       "issue": null,
       "since": "2026-10-31"
+    },
+    {
+      "to": "rpi-alert",
+      "what": "Send each ALERT2-relayed legacy reading's concentrator as a2_source on the reading (it is in the SDR,ALERT2 line's src= today), and optionally drop sources Flood-Net holds (meganet.a2_source_hold, public) before posting. Flood-Net's 0126 reads src= from the frame text until then.",
+      "issue": null,
+      "since": "2026-11-27"
     }
   ]
 }

@@ -56,10 +56,12 @@
 --      only the call and the count are new.
 --   4. The readings already stored from 33300 alone are deleted — those
 --      whose raw submission still exists (30 days) and that nothing else
---      heard (dup_count 0), on days not yet released by retain(). Their
---      hourly and daily rollups are rebuilt, and station_status is worked out
---      again for every station and address they touched. Older ones (before
---      the raw rows' horizon, about 28 October) cannot be told apart and stay.
+--      heard (dup_count 0), on days not yet released by retain() — by
+--      take_out_held_relays(day), one UTC day at a time: a pg_cron job runs
+--      a day every five minutes from the oldest kept submission to today,
+--      then takes itself off the schedule. Their hourly and daily rollups are
+--      rebuilt and station_status worked out again. Older ones (before the
+--      raw rows' horizon, about 28 October) cannot be told apart and stay.
 --      An archived day whose count changes is archived again as its next
 --      version (0073); the old version keeps what was there.
 --
@@ -723,17 +725,19 @@ end;
 $$;
 
 -- ── 4. Taking out what a held source already put in ────────────────────────
--- take_out_held_relays(): every stored ALERT2-relayed legacy reading whose
+-- take_out_held_relays(day): every stored ALERT2-relayed legacy reading whose
 -- submission's frame names only held sources for it, that nothing else heard
 -- (dup_count 0), on a day retain() has not begun releasing — deleted, its
 -- hourly and daily rollups rebuilt (as 0098 rebuilds them), and
 -- station_status worked out again for every station and address it touched:
 -- its newest reading that is left. An address nobody is on record for, left
 -- with no reading at all, loses its row: noise made it. One pass over the
--- ALERT2 readings, so the service key's: run once below, and again after an
--- administrator holds another source.
+-- day's ALERT2 readings, so the service key's: the job below walks the days,
+-- and it is run again after an administrator holds another source.
 
-create or replace function meganet.take_out_held_relays()
+drop function if exists meganet.take_out_held_relays();
+
+create or replace function meganet.take_out_held_relays(p_day date)
 returns jsonb
 language plpgsql
 security definer
@@ -750,14 +754,16 @@ begin
   select r.addr, r.reading_ts, r.value_raw, r.station_id, r.alert_id
     from meganet.reading r
     join meganet.reading_raw w on w.id = r.raw_id
-   where r.protocol = 2
+   where r.reading_ts >= (p_day::timestamp at time zone 'UTC')
+     and r.reading_ts <  ((p_day + 1)::timestamp at time zone 'UTC')
+     and r.protocol = 2
      and r.alert_id is not null
      and r.dup_count = 0
      and r.value_raw = pg_catalog.trunc(r.value_raw)
      and r.value_raw between 0 and 999999999
      and w.frame is not null
      and not exists (select 1 from meganet.archive_day a
-                      where a.table_name = 'reading' and a.day = (r.reading_ts at time zone 'UTC')::date
+                      where a.table_name = 'reading' and a.day = p_day
                         and a.released_at is not null)
      and (select pg_catalog.cardinality(x.s) > 0
                  and x.s <@ (select pg_catalog.array_agg(h.a2_source) from meganet.a2_source_hold h)
@@ -910,28 +916,97 @@ begin
      and (ss.last_reading_at is distinct from l.last_ts or ss.last_seen_at > l.last_ts);
 
   select pg_catalog.count(*), pg_catalog.count(distinct station_id) into v_n, v_s from pg_temp._held_rows;
-  return pg_catalog.jsonb_build_object('readings', v_n, 'stations', v_s);
+  return pg_catalog.jsonb_build_object('day', p_day, 'readings', v_n, 'stations', v_s);
 end;
 $fn$;
 
-comment on function meganet.take_out_held_relays() is
-  'Deletes the stored readings that only sources on meganet.a2_source_hold relayed (as their reading_raw frame says), nothing else heard, on days not yet released; rebuilds their rollups and station_status (0126). The service key''s.';
+comment on function meganet.take_out_held_relays(date) is
+  'Deletes the stored readings of one UTC day that only sources on meganet.a2_source_hold relayed (as their reading_raw frame says), that nothing else heard, on a day not yet released; rebuilds their rollups and station_status (0126). One day at a time, so a run stays small. The service key''s.';
 
-revoke all on function meganet.take_out_held_relays() from public;
+-- The days, one every five minutes. A first try did every day in one
+-- statement inside the migration, and the 1 GB database ran out of memory two
+-- minutes in (27 Nov 2026, 21:46 UTC; it recovered by itself and the
+-- migration rolled back). A day is about 25,000 ALERT2 readings, found on
+-- reading_ts's index, a few seconds' work. app_meta's a2_takeout_day is the
+-- next day to do and a2_takeout_total what has been taken out so far; past
+-- today, the job takes itself off the schedule.
+
+create or replace function meganet.take_out_held_relays_step()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_day date;
+  v     jsonb;
+  v_tot jsonb;
+begin
+  select a.value::date into v_day from meganet.app_meta a where a.key = 'a2_takeout_day';
+  if v_day is null then
+    return pg_catalog.jsonb_build_object('done', true);
+  end if;
+  if v_day > (pg_catalog.now() at time zone 'UTC')::date then
+    delete from meganet.app_meta where key = 'a2_takeout_day';
+    begin
+      perform cron.unschedule('meganet-a2-takeout');
+    exception when others then
+      null;   -- no pg_cron (CI), or already off the schedule
+    end;
+    return pg_catalog.jsonb_build_object('done', true);
+  end if;
+
+  v := meganet.take_out_held_relays(v_day);
+
+  select coalesce(a.value::jsonb, '{"readings": 0, "days": 0}'::jsonb) into v_tot
+    from meganet.app_meta a where a.key = 'a2_takeout_total';
+  v_tot := coalesce(v_tot, '{"readings": 0, "days": 0}'::jsonb);
+  v_tot := pg_catalog.jsonb_build_object(
+             'readings', (v_tot ->> 'readings')::bigint + (v ->> 'readings')::bigint,
+             'days',     (v_tot ->> 'days')::integer + 1,
+             'through',  v_day);
+  insert into meganet.app_meta (key, value) values ('a2_takeout_total', v_tot::text)
+  on conflict (key) do update set value = excluded.value;
+  update meganet.app_meta set value = (v_day + 1)::text where key = 'a2_takeout_day';
+  return v;
+end;
+$fn$;
+
+comment on function meganet.take_out_held_relays_step() is
+  'One day of take_out_held_relays(), the day app_meta a2_takeout_day names, then the next day; past today it takes pg_cron job meganet-a2-takeout off the schedule (0126). The service key''s.';
+
+revoke all on function meganet.take_out_held_relays(date) from public;
+revoke all on function meganet.take_out_held_relays_step() from public;
 do $$
 begin
   if exists (select 1 from pg_catalog.pg_roles where rolname = 'service_role') then
-    grant execute on function meganet.take_out_held_relays() to service_role;
+    grant execute on function meganet.take_out_held_relays(date) to service_role;
+    grant execute on function meganet.take_out_held_relays_step() to service_role;
   end if;
 end
 $$;
 
+-- From the oldest submission still kept (a reading can be stamped a little
+-- before its submission arrived, so a day earlier), found on the primary key
+-- rather than by reading the whole table.
+insert into meganet.app_meta (key, value)
+select 'a2_takeout_day', (coalesce((select (w.received_at at time zone 'UTC')::date from meganet.reading_raw w order by w.id limit 1),
+                                   (pg_catalog.now() at time zone 'UTC')::date) - 1)::text
+on conflict (key) do update set value = excluded.value;
+
 do $$
-declare v jsonb;
 begin
-  v := meganet.take_out_held_relays();
-  raise notice '0126: % readings relayed only by held ALERT2 sources taken out (% register stations)',
-    v ->> 'readings', v ->> 'stations';
+  if not exists (select 1 from pg_catalog.pg_available_extensions where name = 'pg_cron') then
+    raise notice 'pg_cron is not available on this server: run select meganet.take_out_held_relays_step() until it says done.';
+    return;
+  end if;
+  begin
+    create extension if not exists pg_cron;
+    perform cron.schedule('meganet-a2-takeout', '3-58/5 * * * *', 'select meganet.take_out_held_relays_step()');
+    raise notice 'take_out_held_relays_step() runs every five minutes (pg_cron job meganet-a2-takeout) until it reaches today.';
+  exception when others then
+    raise warning 'pg_cron could not be set up (%): run select meganet.take_out_held_relays_step() by hand until it says done.', sqlerrm;
+  end;
 end
 $$;
 

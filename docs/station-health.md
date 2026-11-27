@@ -914,7 +914,8 @@ are 2047, every bit set: the marks a demodulator hears in a quiet channel. It wa
 the legacy reports it relays held back at the door — not stored, not counted as
 the station heard, but kept in the submission and in the receptions for 30
 days. A report a good concentrator relayed as well still goes in. The readings
-a held source had already put in are taken out by `take_out_held_relays()`. ALERT2
+a held source had already put in are taken out a day at a time by
+`take_out_held_relays(day)`, which a background job walks through every five minutes. ALERT2
 gauges' own reports, and legacy bursts heard directly, are never held.
 `db/README.md` has the detail; `tools/check_a2_noisy_sources.sql` proves it.
 
@@ -933,8 +934,9 @@ select a2_source, count(*) reports, count(distinct alert_id) addresses,
 
 A source near the register's own share (about 63 %) with bits set near or above
 6.5 and thousands of addresses is relaying noise. An administrator holds it with
-`select meganet.hold_a2_source(<source>, '<why, with the numbers>')`, then has the
-service key run `select meganet.take_out_held_relays()`; `release_a2_source()`
+`select meganet.hold_a2_source(<source>, '<why, with the numbers>')`, then sets `app_meta`
+`a2_takeout_day` to the oldest day and schedules `take_out_held_relays_step()` again
+(`db/README.md` says how); `release_a2_source()`
 lifts it once the site is fixed. The real fix is at the site, the Bureau's: the
 concentrator's legacy receiver needs its squelch or threshold set, or the
 receiver replaced.

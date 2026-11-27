@@ -65,8 +65,12 @@ begin
       and not has_table_privilege('anon', 'meganet.a2_source_hold', 'insert')
       and not has_table_privilege('authenticated', 'meganet.a2_source_hold', 'delete'));
   perform pg_temp.check_that('only the service key may take readings out',
-    not has_function_privilege('anon', 'meganet.take_out_held_relays()', 'execute')
-      and not has_function_privilege('authenticated', 'meganet.take_out_held_relays()', 'execute'));
+    not has_function_privilege('anon', 'meganet.take_out_held_relays(date)', 'execute')
+      and not has_function_privilege('authenticated', 'meganet.take_out_held_relays(date)', 'execute')
+      and not has_function_privilege('authenticated', 'meganet.take_out_held_relays_step()', 'execute'));
+  perform pg_temp.check_that('the migration left the walk through the days started',
+    (select value::date <= (now() at time zone 'UTC')::date + 1 from meganet.app_meta where key = 'a2_takeout_day')
+      or exists (select 1 from meganet.app_meta where key = 'a2_takeout_total'));
   perform pg_temp.check_that('a2_relay_sources reads every source a frame names for a report, and only for that report',
     meganet.a2_relay_sources(E'SDR,ALERT2,64801,76,src=64801,stamp=1,before=58,mhz=151.5375\r\n'
                              || E'SDR,ALERT2,64801,76,src=64802,path=1-2\nSDR,ALERT2,648011,76,src=9\n'
@@ -166,7 +170,11 @@ begin
   perform meganet.roll_up(now() - interval '2 hours');
   insert into meganet.a2_source_hold (a2_source, reason, held_by) values (64801, '_check: relays noise', '_check');
 
-  v := meganet.take_out_held_relays();
+  -- The day the set-up readings are on (UTC), and one before it with none.
+  v := meganet.take_out_held_relays(((now() - interval '10 minutes') at time zone 'UTC')::date - 1);
+  perform pg_temp.check_that('a day with none of them takes nothing out',
+    (v ->> 'readings')::int = 0 and pg_temp.rows_of(64811) = 1, v::text);
+  v := meganet.take_out_held_relays(((now() - interval '10 minutes') at time zone 'UTC')::date);
   perform pg_temp.check_that('take_out_held_relays removes what only the held source relayed',
     pg_temp.rows_of(64810) = 0 and pg_temp.rows_of(64811) = 0 and (v ->> 'readings')::int >= 2, v::text);
   perform pg_temp.check_that('…and keeps what a good source relayed too, and what something else heard',
@@ -177,7 +185,29 @@ begin
   perform pg_temp.check_that('…and the station_status rows noise alone made',
     not pg_temp.seen(64810) and not pg_temp.seen(64811) and pg_temp.seen(64812));
   perform pg_temp.check_that('run again, it finds nothing more',
-    (meganet.take_out_held_relays() ->> 'readings')::int = 0);
+    (meganet.take_out_held_relays(((now() - interval '10 minutes') at time zone 'UTC')::date) ->> 'readings')::int = 0);
+end
+$$;
+
+-- ── 6. The walk through the days ─────────────────────────────────────────────
+
+do $$
+declare v jsonb; n integer := 0;
+begin
+  delete from meganet.app_meta where key in ('a2_takeout_day', 'a2_takeout_total');
+  insert into meganet.app_meta (key, value) values ('a2_takeout_day', ((now() at time zone 'UTC')::date - 2)::text);
+  loop
+    v := meganet.take_out_held_relays_step();
+    exit when (v ->> 'done')::boolean or n > 10;
+    n := n + 1;
+  end loop;
+  perform pg_temp.check_that('the step does one day a run, then says done past today',
+    n = 3 and (v ->> 'done')::boolean, format('%s steps, %s', n, v));
+  perform pg_temp.check_that('…keeping a running total, and its place gone once done',
+    (select (value::jsonb ->> 'days')::int = 3 from meganet.app_meta where key = 'a2_takeout_total')
+      and not exists (select 1 from meganet.app_meta where key = 'a2_takeout_day'));
+  perform pg_temp.check_that('…and done, it stays done',
+    (meganet.take_out_held_relays_step() ->> 'done')::boolean);
 end
 $$;
 
