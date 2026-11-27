@@ -1812,9 +1812,11 @@ try {
     check('…the toggle brings them back', r.names && r.stripW === 215 && r.stored === 'shown' && r.leafletW === r.mapClientW, JSON.stringify(r));
     // The toggle stays in view when the rail is scrolled: a short window makes
     // the strip scroll, and scrolled to its end the toggle is still at its top.
+    // 300 tall: the rail by job fits any laptop's window, so it takes a window
+    // this short to make it scroll at all.
     for (const names of [true, false]) {
       if (!names) { await page.click('#help-panel .dock-names'); await page.waitForTimeout(400); }
-      await page.setViewportSize({ width: 1440, height: 420 });
+      await page.setViewportSize({ width: 1440, height: 300 });
       await page.waitForTimeout(400);
       const pin = await page.evaluate(() => {
         const strip = document.querySelector('#help-panel .dock-strip');
