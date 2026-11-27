@@ -889,6 +889,56 @@ Copies heard before the receivers measured carriers (RPi ALERT 0.14) have no
 sender and are weighed by pass range only, so the carrier columns fill as the
 weeks go by. Both tables download as CSV from 📤 Export.
 
+
+## Noisy concentrators
+
+An **ALERT2 concentrator** is a site that listens for old-style (legacy) ALERT
+bursts and repacks them into its own ALERT2 messages. When its legacy
+receiver decodes noise, it sends reports on random addresses — and ALERT2's
+own error checks then carry each one to us perfectly. Nothing at our end can
+see the damage, because it was done before the last hop. A station 300 km
+away then shows readings it never sent, and its card's Radio tab says they are
+*not explained*.
+
+The first was **ALERT2 source 33300** (Dumbleton Rocks AL's station number, near
+Mackay), heard first-hand on 151.5375 MHz. Over 25–26 November 2026 it relayed
+173,077 legacy reports on 5,700 of the 8,191 addresses, Bohle River AL's
+among them. Its reports land on a register address 55.8 % of the time, which is
+about what random bits do (5,142 of the 8,191 addresses are on the register,
+63 %); real concentrators land there 95–98 % of the time. Its addresses average
+9.7 of 13 bits set, where real ones average about 6.5, and many of its values
+are 2047, every bit set: the marks a demodulator hears in a quiet channel. It was
+85 % of what that channel stored.
+
+**What Flood-Net does about it** (`0126`): a source on `meganet.a2_source_hold` has
+the legacy reports it relays held back at the door — not stored, not counted as
+the station heard, but kept in the submission and in the receptions for 30
+days. A report a good concentrator relayed as well still goes in. The readings
+a held source had already put in are taken out by `take_out_held_relays()`. ALERT2
+gauges' own reports, and legacy bursts heard directly, are never held.
+`db/README.md` has the detail; `tools/check_a2_noisy_sources.sql` proves it.
+
+**Judging another source.** Two days of receptions, bounded on `heard_at`, the
+indexed column (see CLAUDE.md on the database's disk budget):
+
+```sql
+with reg as (select distinct alert_id from meganet.sensor where alert_id between 1 and 8191)
+select a2_source, count(*) reports, count(distinct alert_id) addresses,
+       round(100.0 * count(*) filter (where alert_id in (select alert_id from reg)) / count(*), 1) pct_on_register,
+       round(avg(length(replace(alert_id::bit(13)::text, '0', '')))::numeric, 1) bits_set
+  from meganet.reception
+ where heard_at >= now() - interval '2 days' and protocol = 'alert2' and alert_id between 1 and 8191 and ok
+ group by 1 order by 2 desc;
+```
+
+A source near the register's own share (about 63 %) with bits set near or above
+6.5 and thousands of addresses is relaying noise. An administrator holds it with
+`select meganet.hold_a2_source(<source>, '<why, with the numbers>')`, then has the
+service key run `select meganet.take_out_held_relays()`; `release_a2_source()`
+lifts it once the site is fixed. The real fix is at the site, the Bureau's: the
+concentrator's legacy receiver needs its squelch or threshold set, or the
+receiver replaced.
+
 ## Repeaters
 
 (after *Receivers*; `health-repeaters.js`)

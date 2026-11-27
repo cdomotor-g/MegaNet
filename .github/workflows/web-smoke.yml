@@ -2546,6 +2546,13 @@ jobs:
       - name: check_alert_copies.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_alert_copies.sql
+      # A concentrator that relays noise (0126): a legacy report only a held
+      # ALERT2 source relayed is not stored and does not count as heard, a
+      # good source's still is, and take_out_held_relays() removes what a
+      # held one already put in, rollups and station_status with it.
+      - name: check_a2_noisy_sources.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_a2_noisy_sources.sql
       # The newest reading of every address (0057), which the agent API's
       # /api/v1/readings/latest reads: one row per address, by the device's
       # own time and the later received of a tie, agreeing with DISTINCT ON —
