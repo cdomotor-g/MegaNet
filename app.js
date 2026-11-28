@@ -8461,12 +8461,12 @@ function stationActionGroups(s, { editor = false } = {}) {
     { label: 'Position', pills: [
       copyLatLonPillHtml(s, { live: editor }),
       directionsPillHtml(s, { live: editor }),
+      typeof MapDrive !== 'undefined' ? MapDrive.pillHtml(s, { editor }) : '',
       // 🎯 Look Around's aim mode: the phone says which way to turn to face
       // this station, and when it is on it. Only where a position is on file.
       typeof StationAR !== 'undefined' && s.lat != null && s.lon != null && isFinite(s.lat) && isFinite(s.lon)
         ? `<button type="button" class="pill" onclick="StationAR.aimAt('${escAttr(s.id)}')"
            title="Open Look Around and aim the phone at this station: it says which way to turn and when you are on it">${pillText('🎯', 'Aim at it')}</button>` : '',
-      typeof MapDrive !== 'undefined' ? MapDrive.pillHtml(s, { editor }) : '',
       editor ? MapMovePin.editorButtonHtml(s) : MapMovePin.popupLinkHtml(s),
       // Where the station's outlet, pits, benchmarks and boards are, and its
       // orifice run (site-features.js, 0061) — signed-in editors only.
